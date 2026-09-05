@@ -92,7 +92,7 @@ export default function Home() {
       setKeyStorageStatus('Keys save automatically in this browser.');
     } catch {
       setKeyStorageStatus(
-        'Could not restore saved keys. Your existing backup has not been changed. Import your backup to recover it.',
+        'Saved keys could not be read. Your backup is intact; import it to recover.',
       );
     }
     setKeysLoaded(true);
@@ -283,9 +283,7 @@ export default function Home() {
         !navigator.mediaDevices?.getUserMedia ||
         typeof MediaRecorder === 'undefined'
       )
-        throw new Error(
-          'Recording is unavailable in this browser. You can upload an audio file instead.',
-        );
+        throw new Error('This browser can’t record. Upload an audio file.');
       const s = await navigator.mediaDevices.getUserMedia({
         audio: { channelCount: 1 },
         video: false,
@@ -433,7 +431,7 @@ export default function Home() {
     }
     if (mode === 'free' && clip.source !== 'recording') {
       setError(
-        'The free trial uses microphone recordings only. Record a take or use your own keys to upload audio.',
+        'The free trial uses microphone recordings. Record a take, or compare this file with your own keys.',
       );
       return;
     }
@@ -668,12 +666,16 @@ export default function Home() {
           disabled={busy}
         >
           <KeyRound />
-          {keyCount ? `${keyCount} accounts added` : 'Connect accounts'}
+          {keyCount ? `API keys · ${keyCount}` : 'Add API keys'}
         </Button>
       </header>
       <section className="intro">
         <div>
-          <h1>Find the model that gets you.</h1>
+          <h1>Eleven speech-to-text models, one recording of your voice.</h1>
+          <p>
+            Record a take, pick models, and read every transcript side by side.
+            Add what you said to score word errors.
+          </p>
         </div>
       </section>
       <section
@@ -696,13 +698,13 @@ export default function Home() {
               <span className="access-choice-heading">
                 <strong>Free trial</strong>
                 <span className="access-choice-state">
-                  {mode === 'free' ? '✓ Selected' : 'Choose free trial'}
+                  {mode === 'free' ? 'Selected' : 'Select'}
                 </span>
               </span>
               <small>
-                {demo.remaining ?? 0} comparisons left · 30-second recordings
+                {demo.remaining ?? 0} left · up to 30 seconds
                 <br />
-                GPT, Voxtral &amp; MAI
+                GPT, Voxtral and MAI
               </small>
             </button>
           )}
@@ -717,23 +719,22 @@ export default function Home() {
             }}
           >
             <span className="access-choice-heading">
-              <strong>Use my API keys</strong>
+              <strong>My API keys</strong>
               <span className="access-choice-state">
-                {mode === 'own' ? '✓ Selected' : 'Choose my keys'}
+                {mode === 'own' ? 'Selected' : 'Select'}
               </span>
             </span>
-            <span>Your provider accounts pay</span>
             <small>
-              All 11 models · 60-second clips
+              All 11 models · up to 60 seconds
               <br />
-              Vocabulary support depends on the model and connection
+              Vocabulary hints depend on the model and route
             </small>
           </button>
         </div>
         <p className="access-current" role="status">
           {mode === 'free'
-            ? 'Free trial selected. This comparison uses Voxbench’s balance.'
-            : 'Your API keys selected. Comparisons are billed to your provider accounts.'}
+            ? 'Free trial selected — Voxbench pays.'
+            : 'Your keys selected — providers bill you.'}
         </p>
         {mode === 'own' && <OpenRouterConnect />}
       </section>
@@ -744,8 +745,20 @@ export default function Home() {
             className={'record-circle ' + (recording ? 'recording' : '')}
             onClick={recording ? stopRecording : startRecording}
             disabled={preparing || busy}
-            aria-label={recording ? 'Stop recording' : clip ? 'Record another take' : 'Record a take'}
-            title={recording ? 'Stop recording' : clip ? 'Record another take' : 'Record a take'}
+            aria-label={
+              recording
+                ? 'Stop recording'
+                : clip
+                  ? 'Record another take'
+                  : 'Record a take'
+            }
+            title={
+              recording
+                ? 'Stop recording'
+                : clip
+                  ? 'Record another take'
+                  : 'Record a take'
+            }
           >
             {preparing ? (
               <Loader2 className="spin" size={30} />
@@ -809,15 +822,15 @@ export default function Home() {
                 </button>
               </div>
               <small>
-                Every model receives the same mono WAV.
+                Every model gets the same 16 kHz mono WAV.
                 <br />
                 Audio ID {clip.hash.slice(0, 12)}
               </small>
             </div>
           ) : (
             <p className="record-tip">
-              Use your everyday pace, names, and technical words. Nothing is
-              sent while recording.
+              Speak at your normal pace, with the names and terms you use. Audio
+              is sent only when you compare.
             </p>
           )}
           <details className="vocab">
@@ -838,7 +851,7 @@ export default function Home() {
                     onCheckedChange={(v) => setUseVocabulary(!!v)}
                     disabled={busy}
                   />
-                  Vocabulary hints
+                  Send vocabulary hints
                 </label>
                 <small>{parseVocabulary(vocabulary).length}/100</small>
               </div>
@@ -858,13 +871,13 @@ export default function Home() {
                   {vocabularySaved
                     ? 'Saved in this browser.'
                     : 'Saves automatically as you type.'}{' '}
-                  One term per line. Hint support varies by connection.
+                  One term per line.
                 </small>
                 <button
                   disabled={busy}
                   onClick={() => dictionaryUpload.current?.click()}
                 >
-                  Import dictionary ↥
+                  Import a dictionary
                 </button>
                 <input
                   ref={dictionaryUpload}
@@ -889,7 +902,7 @@ export default function Home() {
                   onCheckedChange={(v) => setEnglish(!!v)}
                   disabled={busy}
                 />
-                English hints <small>Uncheck for auto-detection</small>
+                English <small>Uncheck to auto-detect language</small>
               </label>
             </div>
           </details>
@@ -908,7 +921,7 @@ export default function Home() {
               }
             >
               {mode === 'free'
-                ? 'Free trio'
+                ? 'Free trial: 3 models'
                 : selected.length === models.length
                   ? 'Deselect all'
                   : 'Select all'}
@@ -948,7 +961,7 @@ export default function Home() {
                       <strong>{m.name}</strong>
                       <span className="model-meta">
                         {m.maker} ·{' '}
-                        {c === 'openrouter' ? 'OpenRouter' : 'Direct'}
+                        {c === 'openrouter' ? 'via OpenRouter' : 'direct'}
                       </span>
                       <small
                         className={
@@ -960,8 +973,8 @@ export default function Home() {
                       >
                         {m.id === 'gpt'
                           ? c === 'openai'
-                            ? 'Custom vocabulary · your OpenAI key'
-                            : 'No custom vocabulary via OpenRouter · add an OpenAI key to enable'
+                            ? 'Custom vocabulary via your OpenAI key'
+                            : 'Add an OpenAI key for vocabulary'
                           : m.vocabulary}
                       </small>
                     </span>
@@ -974,8 +987,8 @@ export default function Home() {
                         mode === 'free'
                           ? 'Included in your free comparison'
                           : hasKey
-                            ? 'Key entered; not yet verified'
-                            : 'Key needed'
+                            ? 'Key added'
+                            : 'No key'
                       }
                     />
                   </label>
@@ -999,13 +1012,13 @@ export default function Home() {
               <span>
                 {mode === 'free'
                   ? `${demo.remaining ?? 0} free comparisons left`
-                  : `${ready} with keys entered`}
+                  : `${ready} with keys`}
               </span>
             </div>
             {busy ? (
               <Button variant="outline" onClick={cancel}>
                 <X />
-                Stop comparison
+                Stop
               </Button>
             ) : (
               <Button
@@ -1026,7 +1039,7 @@ export default function Home() {
                 {mode === 'free'
                   ? 'Compare for free'
                   : ready
-                    ? 'Compare using my keys'
+                    ? `Compare ${ready} ${ready === 1 ? 'model' : 'models'}`
                     : 'Add keys to compare'}
                 <ArrowUpRight />
               </Button>
@@ -1034,20 +1047,20 @@ export default function Home() {
           </div>
           {mode === 'free' && clip && clip.source !== 'recording' && (
             <p role="alert">
-              Free trials use microphone recordings only. Record a take or
-              select your own keys to compare this upload.
+              The free trial uses microphone recordings. Record a take, or
+              compare this file with your own keys.
             </p>
           )}
           {mode === 'free' && clip && clip.duration > 30 && (
             <p role="alert">
-              This clip is longer than the free trial’s 30-second limit. Record
-              a shorter take or use your own keys.
+              Free trial takes are up to 30 seconds. Record a shorter one, or
+              use your own keys.
             </p>
           )}
           <p className="billing-note">
             {mode === 'free'
-              ? 'Voxbench pays for this comparison. Each attempt uses one free trial, including provider failures. A shared-network limit also applies.'
-              : 'Compare sends audio to the selected providers with keys. Each request is billed by that provider. Missing keys are shown as skipped.'}
+              ? 'Each attempt uses one free comparison, including failed ones. Limits apply per browser and network.'
+              : 'Only models with a key run.'}
           </p>
         </div>
       </section>
@@ -1059,19 +1072,19 @@ export default function Home() {
       <section className="results">
         <div className="results-heading">
           <div>
-            <h2 className="section-label">TRANSCRIPTS</h2>
+            <h2 className="section-label">Transcripts</h2>
           </div>
           {active ? (
             <div className="view-actions">
               <Tabs value={view} onValueChange={(v) => setView(String(v))}>
                 <TabsList>
                   <TabsTrigger value="raw">Raw</TabsTrigger>
-                  <TabsTrigger value="lowercase">lowercase</TabsTrigger>
+                  <TabsTrigger value="lowercase">Lowercase</TabsTrigger>
                 </TabsList>
               </Tabs>
               <Button variant="outline" size="sm" onClick={exportRun}>
                 <Download />
-                Export run
+                Export JSON
               </Button>
             </div>
           ) : null}
@@ -1096,7 +1109,7 @@ export default function Home() {
         ) : null}
         <details className="reference" open={!!active}>
           <summary>
-            Reference transcript <span>Optional · what you actually said</span>
+            Reference <span>What you said · optional</span>
           </summary>
           <textarea
             aria-label="Reference transcript"
@@ -1113,12 +1126,11 @@ export default function Home() {
                 );
               else setReference(t);
             }}
-            placeholder="Type the exact words, including hesitations if you want to score them. No provider receives this text."
+            placeholder="The exact words you said. Include hesitations to score them. Stays in your browser."
           />
           <p>
-            Word errors count substitutions, missing words and extra words. Case
-            and punctuation are ignored. Lowercase is a local preview; scores
-            always use the raw transcript.
+            Word errors count substituted, missing, and extra words, ignoring
+            case and punctuation. Scores use the raw transcript.
           </p>
         </details>
         {active ? (
@@ -1127,8 +1139,8 @@ export default function Home() {
               <span>
                 {active.clip.duration.toFixed(1)}s ·{' '}
                 {active.clip.hash.slice(0, 12)} · {active.terms.length}{' '}
-                vocabulary hints ·{' '}
-                {active.english ? 'English hints' : 'Auto language'}
+                {active.terms.length === 1 ? 'hint' : 'hints'} ·{' '}
+                {active.english ? 'English' : 'Auto-detect language'}
               </span>
               <span aria-live="polite">
                 {
@@ -1138,7 +1150,8 @@ export default function Home() {
                     ),
                   ).length
                 }
-                /{active.results.length} finished
+                {' of '}
+                {active.results.length} done
               </span>
             </div>
             <div className="result-grid">
@@ -1156,28 +1169,25 @@ export default function Home() {
               ))}
             </div>
             <p className="timing-note">
-              The latest 20 comparisons stay in this tab. Export any you want to
-              keep. Timing includes whole-file upload and provider processing,
-              not live streaming latency. Up to three requests run together. A
-              blank cost means the provider did not report it.
+              Time covers upload and processing of the whole file. Up to three
+              requests run at once. A blank cost means the provider reported
+              none. The last 20 takes stay in this tab; export any you want to
+              keep.
             </p>
           </>
         ) : (
           <div className="empty-results">
             <AudioLines size={30} />
-            <p>
-              Record a take, choose your models, then compare.
-            </p>
+            <p>Transcripts appear here after you compare.</p>
           </div>
         )}
       </section>
       <footer>
         <a href="/privacy">Privacy</a>
         <span>
-          Keys and vocabulary are saved in this browser. Audio, keys and
-          optional vocabulary pass through our server to selected providers;
-          their data policies apply. We keep operational logs, not audio or
-          keys. Export results before closing.
+          Keys and vocabulary stay in this browser. Audio and keys pass through
+          Voxbench to the providers you choose; their data policies apply. We
+          log errors only.
         </span>
         <details>
           <summary>Model sources</summary>

@@ -36,9 +36,9 @@ export function OpenRouterConnect() {
   return (
     <div className="openrouter-connect">
       <Button disabled={connecting} onClick={connect}>
-        Continue with OpenRouter ↗
+        Connect OpenRouter
       </Button>
-      <p>Approve access to your OpenRouter balance. No key to copy.</p>
+      <p>Approve access to your OpenRouter balance in a popup.</p>
       {error && <p role="alert">{error}</p>}
     </div>
   );

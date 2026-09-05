@@ -45,12 +45,11 @@ export function Connections({
     >
       <DialogContent className="connections-dialog">
         <DialogHeader>
-          <DialogTitle>Connect your accounts</DialogTitle>
+          <DialogTitle>API keys</DialogTitle>
           <DialogDescription>
-            Keys are saved in this browser’s local storage and restored after
-            reloads and site updates. Local storage is not an encrypted vault.
-            Keys and audio are sent through this site to the selected provider
-            when you compare.
+            Keys are saved unencrypted in this browser’s local storage and
+            survive reloads. When you compare, keys and audio pass through
+            Voxbench to the chosen provider.
           </DialogDescription>
         </DialogHeader>
         <OpenRouterConnect />
@@ -83,8 +82,8 @@ export function Connections({
           <div className="key-transfer">
             <label htmlFor="key-transfer-json">
               {transfer === 'export'
-                ? 'Copy this JSON into your 1Password Secure Note.'
-                : 'Paste your API keys JSON. Imported providers replace matching keys; other keys are kept.'}
+                ? 'Copy this JSON somewhere safe, like a password manager.'
+                : 'Paste exported JSON. Imported keys replace matching ones; the rest stay.'}
             </label>
             <textarea
               id="key-transfer-json"
@@ -170,7 +169,7 @@ export function Connections({
               closeTransfer();
             }}
           >
-            Forget saved keys
+            Remove all keys
           </Button>
           <Button onClick={() => onOpenChange(false)}>Done</Button>
         </div>

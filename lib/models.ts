@@ -44,7 +44,7 @@ export const models: Model[] = [
     model: 'openai/gpt-transcribe',
     direct: 'openai',
     directModel: 'gpt-transcribe',
-    vocabulary: 'Custom vocabulary requires your OpenAI key',
+    vocabulary: 'Custom vocabulary with an OpenAI key',
     docs: 'https://openrouter.ai/openai/gpt-transcribe',
   },
   {
@@ -53,7 +53,7 @@ export const models: Model[] = [
     maker: 'ElevenLabs',
     connection: 'elevenlabs',
     model: 'scribe_v2',
-    vocabulary: 'Keyterms · additional provider charge',
+    vocabulary: 'Keyterms · ElevenLabs charges extra',
     docs: 'https://elevenlabs.io/docs/overview/capabilities/speech-to-text',
   },
   {
@@ -62,7 +62,7 @@ export const models: Model[] = [
     maker: 'Mistral',
     connection: 'openrouter',
     model: 'mistralai/voxtral-mini-transcribe',
-    vocabulary: 'No custom vocabulary support via OpenRouter',
+    vocabulary: 'Vocabulary unsupported via OpenRouter',
     docs: 'https://docs.mistral.ai/models/voxtral-mini-transcribe-26-02',
   },
   {
@@ -82,7 +82,7 @@ export const models: Model[] = [
     model: 'deepgram/nova-3',
     direct: 'deepgram',
     directModel: 'nova-3',
-    vocabulary: 'Vocabulary requires a direct Deepgram key',
+    vocabulary: 'Add a Deepgram key for vocabulary',
     docs: 'https://developers.deepgram.com/docs/keyterm',
   },
   {
@@ -91,7 +91,7 @@ export const models: Model[] = [
     maker: 'Microsoft',
     connection: 'openrouter',
     model: 'microsoft/mai-transcribe-2',
-    vocabulary: 'Phrase-list hints via OpenRouter',
+    vocabulary: 'Phrase list',
     docs: 'https://openrouter.ai/microsoft/mai-transcribe-2',
   },
   {
@@ -100,7 +100,7 @@ export const models: Model[] = [
     maker: 'NVIDIA',
     connection: 'openrouter',
     model: 'nvidia/nemotron-3.5-asr-streaming-multilingual-0.6b',
-    vocabulary: 'No custom vocabulary support',
+    vocabulary: 'Vocabulary unsupported',
     docs: 'https://openrouter.ai/nvidia/nemotron-3.5-asr-streaming-multilingual-0.6b',
   },
   {
@@ -109,7 +109,7 @@ export const models: Model[] = [
     maker: 'Qwen',
     connection: 'openrouter',
     model: 'qwen/qwen3-asr-1.7b',
-    vocabulary: 'No custom vocabulary support',
+    vocabulary: 'Vocabulary unsupported',
     docs: 'https://openrouter.ai/qwen/qwen3-asr-1.7b',
   },
   {
@@ -118,7 +118,7 @@ export const models: Model[] = [
     maker: 'NVIDIA',
     connection: 'openrouter',
     model: 'nvidia/parakeet-tdt-0.6b-v3',
-    vocabulary: 'No custom vocabulary support',
+    vocabulary: 'Vocabulary unsupported',
     docs: 'https://openrouter.ai/nvidia/parakeet-tdt-0.6b-v3',
   },
 ];
@@ -136,21 +136,21 @@ export const connections: {
   },
   {
     id: 'openai',
-    name: 'OpenAI · optional direct key',
+    name: 'OpenAI (optional)',
     url: 'https://platform.openai.com/api-keys',
-    note: 'Takes priority for GPT Transcribe and enables custom vocabulary. Uses your OpenAI balance.',
+    note: 'Runs GPT Transcribe directly with custom vocabulary. Billed to OpenAI.',
   },
   {
     id: 'meta',
     name: 'Meta Model API',
     url: 'https://developer.meta.com/ai/products/meta-model-api/',
-    note: 'Muse Voice Transcribe. Model access depends on your Meta account.',
+    note: 'Muse Voice Transcribe. Access depends on your Meta account.',
   },
   {
     id: 'gemini',
     name: 'Google AI Studio',
     url: 'https://aistudio.google.com/apikey',
-    note: 'Gemini 3.5 Transcribe, including custom vocabulary.',
+    note: 'Gemini 3.5 Transcribe with custom vocabulary.',
   },
   {
     id: 'elevenlabs',
@@ -162,13 +162,13 @@ export const connections: {
     id: 'assemblyai',
     name: 'AssemblyAI',
     url: 'https://www.assemblyai.com/dashboard/signup',
-    note: 'Universal-3.5 Pro. Audio is uploaded to AssemblyAI for its transcription job.',
+    note: 'Universal-3.5 Pro. Audio is uploaded to AssemblyAI.',
   },
   {
     id: 'deepgram',
-    name: 'Deepgram · optional direct key',
+    name: 'Deepgram (optional)',
     url: 'https://console.deepgram.com/',
-    note: 'Uses Deepgram directly when entered, enabling vocabulary hints.',
+    note: 'Runs Nova-3 directly with vocabulary hints. Billed to Deepgram.',
   },
 ];
 export type Keys = Partial<Record<Connection, string>>;

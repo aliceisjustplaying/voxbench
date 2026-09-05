@@ -72,9 +72,9 @@ export function ResultCard({
             {
               queued: 'Queued',
               running: 'Transcribing',
-              done: 'Complete',
+              done: 'Done',
               error: 'Failed',
-              skipped: 'Key needed',
+              skipped: 'No key',
               cancelled: 'Stopped',
             }[result.status]
           }
@@ -84,8 +84,7 @@ export function ResultCard({
         <>
           <div className="result-stats">
             <span>
-              {(result.output.elapsedMs / 1000).toFixed(1)}s{' '}
-              <small>request time</small>
+              {(result.output.elapsedMs / 1000).toFixed(1)}s <small>time</small>
             </span>
             <span>
               {score ? `${(score.rate * 100).toFixed(1)}%` : '—'}{' '}
@@ -95,7 +94,7 @@ export function ResultCard({
               {result.output.cost !== null
                 ? '$' + result.output.cost.toFixed(5)
                 : '—'}{' '}
-              <small>reported cost</small>
+              <small>cost</small>
             </span>
           </div>
           <p className="transcript">
@@ -113,7 +112,7 @@ export function ResultCard({
               onClick={() => onChange({ preferred: !result.preferred })}
             >
               <Star fill={result.preferred ? 'currentColor' : 'none'} />
-              {result.preferred ? 'A favorite' : 'Prefer this'}
+              {result.preferred ? 'Preferred' : 'Prefer'}
             </Button>
           </div>
           {copyError ? (
@@ -122,7 +121,7 @@ export function ResultCard({
             </p>
           ) : null}
           <details>
-            <summary>Settings & differences</summary>
+            <summary>Details</summary>
             <div className="result-details">
               <p>
                 <strong>Model:</strong> {result.output.model}
@@ -135,20 +134,19 @@ export function ResultCard({
               </p>
               {terms.length ? (
                 <p>
-                  {hits.length} of {terms.length} listed terms appear in the
-                  transcript. This is presence, not accuracy.
+                  {hits.length} of {terms.length} vocabulary terms appear in the
+                  transcript.
                 </p>
               ) : null}
               <p>
-                <strong>Same audio:</strong>{' '}
+                <strong>Audio ID:</strong>{' '}
                 {result.output.audioHash.slice(0, 16)}
               </p>
               {score ? (
                 <>
                   <p>
-                    {score.errors} edits / {score.referenceWords} reference
-                    words. Case and punctuation ignored; numbers are not
-                    normalized.
+                    {score.errors} edits across {score.referenceWords} reference
+                    words, ignoring case and punctuation.
                   </p>
                   <div className="word-diff">
                     {score.edits.map((e, i) => (
@@ -184,9 +182,9 @@ export function ResultCard({
       ) : (
         <div className="result-placeholder">
           {result.status === 'queued'
-            ? 'Waiting for an available comparison slot.'
+            ? 'Waiting for a slot.'
             : result.status === 'running'
-              ? 'Listening to the same take…'
+              ? 'Transcribing…'
               : result.error || 'This request was stopped.'}
           {result.diagnostics && (
             <details className="provider-diagnostics">
@@ -228,7 +226,7 @@ export function ResultCard({
               onClick={onRetry}
             >
               <RotateCcw />
-              Retry this model
+              Retry
             </Button>
           ) : null}
         </div>
