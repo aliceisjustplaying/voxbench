@@ -1,4 +1,5 @@
 'use client';
+import Script from 'next/script';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Mic,
@@ -618,6 +619,15 @@ export default function Home() {
   }, [active]);
   return (
     <main className="lab">
+      <Script
+        id="plausible-init"
+        strategy="afterInteractive"
+      >{`window.plausible=window.plausible||function(){(plausible.q=plausible.q||[]).push(arguments)},plausible.init=plausible.init||function(i){plausible.o=i||{}};plausible.init()`}</Script>
+      <Script
+        async
+        src="https://p.mosphere.at/js/pa-CGNBvNHBZdU1DjZgLJMEm.js"
+        strategy="afterInteractive"
+      />
       <header>
         <a className="brand" href="/">
           <AudioLines /> Voxbench<span>SPEECH RECOGNITION, COMPARED</span>

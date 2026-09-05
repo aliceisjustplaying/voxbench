@@ -3,17 +3,12 @@
   "account_id": "b752c979e541327de3e87e52f0906aa1",
   "main": "dist/server/index.js",
   "compatibility_date": "2026-05-15",
-  "compatibility_flags": [
-    "nodejs_compat"
-  ],
+  "compatibility_flags": ["nodejs_compat"],
   "no_bundle": true,
   "rules": [
     {
       "type": "ESModule",
-      "globs": [
-        "**/*.js",
-        "**/*.mjs"
-      ]
+      "globs": ["**/*.js", "**/*.mjs"]
     }
   ],
   "assets": {
@@ -53,5 +48,11 @@
   ],
   "vars": {
     "DEMO_ENABLED": "true"
-  }
+  },
+  "routes": [
+    {
+      "pattern": "voxbench.app",
+      "custom_domain": true
+    }
+  ]
 }
