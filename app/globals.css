@@ -721,6 +721,7 @@ textarea:disabled {
   max-width: 620px !important;
   padding: 25px !important;
   max-height: 90dvh;
+  overflow-y: auto;
   display: flex !important;
   flex-direction: column;
 }
@@ -934,4 +935,25 @@ summary:focus-visible {
   color: var(--primary);
   text-align: left;
   font-weight: 500;
+}
+
+.key-transfer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.key-transfer {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+.key-transfer textarea {
+  width: 100%;
+  min-height: 180px;
+  resize: vertical;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px;
+  font: 13px/1.5 monospace;
+  overflow-wrap: anywhere;
 }

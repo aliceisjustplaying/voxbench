@@ -15,6 +15,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { KEY_STORAGE, parseKeys, saveKeys } from '@/lib/key-storage';
 import { Connections } from '@/components/lab/connections';
 import { ResultCard, type Result } from '@/components/lab/result-card';
 import { models, connectionFor, type Keys } from '@/lib/models';
@@ -34,6 +35,33 @@ type Run = {
 export default function Home() {
   const [keys, setKeys] = useState<Keys>({}),
     [keysOpen, setKeysOpen] = useState(false);
+  const [keyStorageStatus, setKeyStorageStatus] = useState(
+    'Loading saved keys…',
+  );
+  const [keysLoaded, setKeysLoaded] = useState(false);
+  useEffect(() => {
+    try {
+      const backup = localStorage.getItem(KEY_STORAGE);
+      if (backup !== null) setKeys(parseKeys(backup));
+      setKeyStorageStatus('Keys save automatically in this browser.');
+    } catch {
+      setKeyStorageStatus(
+        'Could not restore saved keys. Your existing backup has not been changed. Import your backup to recover it.',
+      );
+    }
+    setKeysLoaded(true);
+  }, []);
+  function updateKeys(next: Keys) {
+    setKeys(next);
+    try {
+      saveKeys(localStorage, next);
+      setKeyStorageStatus('Saved in this browser.');
+    } catch {
+      setKeyStorageStatus(
+        'Could not save keys. Keep this tab open and export a backup before refreshing.',
+      );
+    }
+  }
   const [selected, setSelected] = useState(models.slice(0, 8).map((m) => m.id));
   const [clip, setClip] = useState<Clip | null>(null),
     [recording, setRecording] = useState(false),
@@ -809,7 +837,9 @@ export default function Home() {
         open={keysOpen}
         onOpenChange={setKeysOpen}
         keys={keys}
-        onChange={setKeys}
+        onChange={updateKeys}
+        storageStatus={keyStorageStatus}
+        loaded={keysLoaded}
       />
     </main>
   );
