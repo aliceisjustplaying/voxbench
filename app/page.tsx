@@ -445,7 +445,7 @@ export default function Home() {
         ],
         { type: 'application/json' },
       ),
-      'voice-lab-' + active.at.replaceAll(':', '-') + '.json',
+      'voxbench-' + active.at.replaceAll(':', '-') + '.json',
     );
   }
   useEffect(() => {
@@ -515,7 +515,7 @@ export default function Home() {
     <main className="lab">
       <header>
         <a className="brand" href="/">
-          <AudioLines /> voice lab<span>PERSONAL SPEECH BENCH</span>
+          <AudioLines /> Voxbench<span>SPEECH RECOGNITION, COMPARED</span>
         </a>
         <Button
           variant="outline"
@@ -528,11 +528,8 @@ export default function Home() {
       </header>
       <section className="intro">
         <div>
-          <span className="eyebrow">YOUR VOICE. SAME RECORDING.</span>
           <h1>Find the model that gets you.</h1>
-          <p>
-            Compare the words first. Pick the voice keyboard backend second.
-          </p>
+          <p>One recording. Eleven models. Compare what they hear.</p>
         </div>
         <span className="bench-tag">
           11 contenders
@@ -605,7 +602,7 @@ export default function Home() {
               <div>
                 <span>{clip.name}</span>
                 <button
-                  onClick={() => downloadBlob(clip.blob, 'voice-lab-take.wav')}
+                  onClick={() => downloadBlob(clip.blob, 'voxbench-take.wav')}
                   title="Download the exact audio used"
                 >
                   Save WAV <Download size={13} />
@@ -623,64 +620,74 @@ export default function Home() {
               sent while recording.
             </p>
           )}
-          <div className="vocab">
-            <div className="vocab-heading">
-              <label className="check-label">
+          <details className="vocab">
+            <summary>
+              Vocabulary &amp; language
+              <span>
+                {useVocabulary
+                  ? `${parseVocabulary(vocabulary).length} hints`
+                  : 'Hints off'}
+              </span>
+            </summary>
+            <div className="vocab-content">
+              <div className="vocab-heading">
+                <label className="check-label">
+                  <Checkbox
+                    checked={useVocabulary}
+                    onCheckedChange={(v) => setUseVocabulary(!!v)}
+                    disabled={busy}
+                  />
+                  Vocabulary hints
+                </label>
+                <small>{parseVocabulary(vocabulary).length}/100</small>
+              </div>
+              <textarea
+                aria-label="Personal vocabulary"
+                placeholder={'Alice\nSourdough\nMonologue'}
+                rows={3}
+                value={vocabulary}
+                onChange={(e) => setVocabulary(e.target.value)}
+                disabled={busy}
+              />
+              {vocabularyStorageError && (
+                <p role="alert">{vocabularyStorageError}</p>
+              )}
+              <div className="dictionary-import">
+                <small>
+                  {vocabularySaved
+                    ? 'Saved in this browser.'
+                    : 'Saves automatically as you type.'}{' '}
+                  One term per line. Hint support varies by connection.
+                </small>
+                <button
+                  disabled={busy}
+                  onClick={() => dictionaryUpload.current?.click()}
+                >
+                  Import dictionary ↥
+                </button>
+                <input
+                  ref={dictionaryUpload}
+                  type="file"
+                  accept=".txt,.json"
+                  className="sr-only"
+                  aria-label="Import vocabulary from Monologue JSON or a text file"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) void loadDictionary(f);
+                    e.target.value = '';
+                  }}
+                />
+              </div>
+              <label className="check-label language">
                 <Checkbox
-                  checked={useVocabulary}
-                  onCheckedChange={(v) => setUseVocabulary(!!v)}
+                  checked={english}
+                  onCheckedChange={(v) => setEnglish(!!v)}
                   disabled={busy}
                 />
-                Vocabulary hints
+                English hints <small>Uncheck for auto-detection</small>
               </label>
-              <small>{parseVocabulary(vocabulary).length}/100</small>
             </div>
-            <textarea
-              aria-label="Personal vocabulary"
-              placeholder={'Alice\nSourdough\nMonologue'}
-              rows={3}
-              value={vocabulary}
-              onChange={(e) => setVocabulary(e.target.value)}
-              disabled={busy}
-            />
-            {vocabularyStorageError && (
-              <p role="alert">{vocabularyStorageError}</p>
-            )}
-            <div className="dictionary-import">
-              <small>
-                {vocabularySaved
-                  ? 'Saved in this browser.'
-                  : 'Saves automatically as you type.'}{' '}
-                One term per line. Hint support varies by connection.
-              </small>
-              <button
-                disabled={busy}
-                onClick={() => dictionaryUpload.current?.click()}
-              >
-                Import dictionary ↥
-              </button>
-              <input
-                ref={dictionaryUpload}
-                type="file"
-                accept=".txt,.json"
-                className="sr-only"
-                aria-label="Import vocabulary from Monologue JSON or a text file"
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (f) void loadDictionary(f);
-                  e.target.value = '';
-                }}
-              />
-            </div>
-            <label className="check-label language">
-              <Checkbox
-                checked={english}
-                onCheckedChange={(v) => setEnglish(!!v)}
-                disabled={busy}
-              />
-              English hints <small>Uncheck for auto-detection</small>
-            </label>
-          </div>
+          </details>
         </div>
         <div className="lineup">
           <div className="section-label">02 — THE LINEUP</div>
@@ -777,7 +784,7 @@ export default function Home() {
       <section className="results">
         <div className="results-heading">
           <div>
-            <div className="section-label">03 — SIDE BY SIDE</div>
+            <div className="section-label">03 — TRANSCRIPTS</div>
             <h2>
               {active
                 ? 'Same take. Different ears.'

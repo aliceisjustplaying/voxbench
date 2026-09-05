@@ -976,3 +976,182 @@ summary:focus-visible {
   color: #26344e;
   font: 12px/1.5 monospace;
 }
+
+/* Voxbench: a compact recording desk with readable model choices. */
+.intro {
+  padding: 28px 0;
+}
+.intro h1 {
+  margin: 0 0 10px;
+  font-size: clamp(28px, 3vw, 40px);
+}
+.brand {
+  white-space: nowrap;
+}
+.workspace > * {
+  min-width: 0;
+}
+.vocab > summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  list-style: none;
+}
+.vocab > summary::after {
+  content: '+';
+  font-size: 20px;
+  color: var(--primary);
+}
+.vocab[open] > summary::after {
+  content: '−';
+}
+.vocab > summary span {
+  margin-left: auto;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  font-weight: 400;
+}
+.vocab-content {
+  padding-top: 18px;
+}
+.model-choice:focus-within {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+@media (max-width: 720px) {
+  .lab {
+    padding: 0 14px max(28px, env(safe-area-inset-bottom));
+  }
+  header {
+    height: auto;
+    min-height: 72px;
+    gap: 10px;
+    flex-wrap: wrap;
+    padding: 12px 0;
+  }
+  header > button {
+    font-size: 14px;
+    min-height: 44px;
+  }
+  .intro {
+    padding: 22px 0;
+  }
+  .intro h1 {
+    font-size: 30px;
+    letter-spacing: -1px;
+  }
+  .intro p {
+    font-size: 16px;
+  }
+  .capture {
+    padding: 20px 18px;
+  }
+  .record-actions > button {
+    min-height: 46px;
+    flex: 1;
+  }
+  .record-tip {
+    margin-bottom: 12px;
+  }
+  .vocab {
+    margin-top: 18px;
+    padding-top: 12px;
+  }
+  .vocab > summary {
+    min-height: 44px;
+  }
+  .model-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+  .model-choice {
+    padding: 14px;
+    gap: 12px;
+  }
+  .model-choice strong {
+    font-size: 16px;
+  }
+  .model-meta {
+    font-size: 14px;
+  }
+  .key-dot {
+    display: block;
+    width: 8px;
+    height: 8px;
+  }
+  .lineup {
+    padding: 20px 16px;
+  }
+  .lineup-title {
+    margin: 8px 0 12px;
+  }
+  .text-button,
+  .dictionary-import button,
+  .audio-preview button {
+    min-height: 44px;
+    font-size: 14px;
+  }
+  .compare-bar {
+    flex-wrap: wrap;
+    gap: 12px;
+    padding-top: 18px;
+  }
+  .compare-bar > div {
+    flex-direction: row;
+    align-items: baseline;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .compare-bar > button {
+    width: 100%;
+    min-height: 48px;
+    font-size: 16px;
+  }
+  .compare-bar span,
+  .billing-note {
+    font-size: 13px;
+  }
+  .result-actions button,
+  .view-actions button,
+  .run-history button {
+    min-height: 44px;
+  }
+  .view-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+  .view-actions [data-slot='tabs-list'] {
+    height: 44px;
+  }
+  .result-top .eyebrow,
+  .state,
+  .result-stats small {
+    font-size: 12px;
+  }
+  .connections-dialog {
+    max-height: 90dvh;
+    padding: 20px 16px !important;
+  }
+  .dialog-actions {
+    flex-wrap: wrap;
+  }
+  .dialog-actions button {
+    min-height: 44px;
+  }
+  textarea,
+  .key-field input,
+  .key-transfer textarea,
+  .note-label textarea {
+    font-size: 16px;
+  }
+  .key-field input {
+    min-height: 44px;
+  }
+  .key-field > div {
+    flex-wrap: wrap;
+  }
+}

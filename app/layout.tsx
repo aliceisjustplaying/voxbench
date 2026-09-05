@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Voice Lab — compare your transcripts',
+  title: 'Voxbench — compare your transcripts',
   description:
     'Compare speech recognition models on identical recordings of your voice.',
 };

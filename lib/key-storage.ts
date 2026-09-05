@@ -6,7 +6,7 @@ export function parseKeys(json: string): Keys {
   try {
     value = JSON.parse(json);
   } catch {
-    throw new Error('Paste a valid JSON object exported from Voice Lab.');
+    throw new Error('Paste a valid JSON object exported from Voxbench.');
   }
   if (!value || typeof value !== 'object' || Array.isArray(value))
     throw new Error('The backup must be a JSON object.');

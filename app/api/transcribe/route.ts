@@ -9,7 +9,7 @@ export async function POST(request: Request) {
   const origin = request.headers.get('origin');
   if (origin && origin !== new URL(request.url).origin)
     return Response.json(
-      { error: 'Open this comparison from the Voice Lab page.' },
+      { error: 'Open this comparison from the Voxbench page.' },
       { status: 403 },
     );
   const headers = { 'Cache-Control': 'no-store' };
