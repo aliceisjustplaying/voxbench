@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
 
@@ -16,6 +16,7 @@ const geistMono = Geist_Mono({
 
 const description =
   'Record a take and read 11 speech-to-text transcripts side by side. Free trial, bring your own keys, or log in with OpenRouter.';
+export const viewport: Viewport = { themeColor: '#1d6b45' };
 export const metadata: Metadata = {
   metadataBase: new URL('https://voxbench.app'),
   title: 'Voxbench — which speech-to-text model hears you best?',
@@ -35,6 +36,14 @@ export const metadata: Metadata = {
       },
     ],
   },
+  icons: {
+    icon: [
+      { url: '/favicon.svg', type: 'image/svg+xml' },
+      { url: '/favicon-32.png', sizes: '32x32', type: 'image/png' },
+    ],
+    apple: '/apple-touch-icon.png',
+  },
+  manifest: '/manifest.webmanifest',
   twitter: {
     card: 'summary_large_image',
     site: '@aliceisplaying',

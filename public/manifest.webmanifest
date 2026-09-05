@@ -1,0 +1,13 @@
+{
+  "name": "Voxbench",
+  "short_name": "Voxbench",
+  "description": "Which speech-to-text model hears you best?",
+  "start_url": "/",
+  "display": "browser",
+  "background_color": "#ffffff",
+  "theme_color": "#1d6b45",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
