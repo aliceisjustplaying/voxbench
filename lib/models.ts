@@ -113,6 +113,12 @@ export const models: Model[] = [
     docs: 'https://openrouter.ai/nvidia/parakeet-tdt-0.6b-v3',
   },
 ];
+/**
+ * Connections routed through /api/transcribe instead of straight from the
+ * browser. Empty by default: every provider currently allows CORS from
+ * voxbench.app. Add a connection here if a provider drops CORS support.
+ */
+export const PROXIED_CONNECTIONS: Connection[] = [];
 export const connections: {
   id: Connection;
   name: string;

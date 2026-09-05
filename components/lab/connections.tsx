@@ -48,8 +48,8 @@ export function Connections({
           <DialogTitle>API keys</DialogTitle>
           <DialogDescription>
             Keys are saved unencrypted in this browser’s local storage and
-            survive reloads. When you compare, keys and audio pass through
-            Voxbench to the chosen provider.
+            survive reloads. When you compare, your browser sends keys and audio
+            straight to each provider.
           </DialogDescription>
         </DialogHeader>
         <OpenRouterConnect />

@@ -2,7 +2,7 @@ export function contentSecurityPolicy(nonce: string, development = false) {
   return [
     "default-src 'self'",
     `script-src 'self' 'nonce-${nonce}' https://p.mosphere.at https://challenges.cloudflare.com${development ? " 'unsafe-eval'" : ''}`,
-    "connect-src 'self' https://openrouter.ai https://p.mosphere.at https://challenges.cloudflare.com" +
+    "connect-src 'self' https://openrouter.ai https://api.openai.com https://generativelanguage.googleapis.com https://api.elevenlabs.io https://api.deepgram.com https://api.assemblyai.com https://api.meta.ai https://p.mosphere.at https://challenges.cloudflare.com" +
       (development ? ' ws: wss:' : ''),
     'frame-src https://challenges.cloudflare.com',
     "img-src 'self' data: blob:",

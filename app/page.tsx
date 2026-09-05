@@ -26,21 +26,31 @@ import {
   saveVocabulary,
   readSettings,
   writeSettings,
+  type Settings,
 } from '@/lib/key-storage';
 import { DemoCheck } from '@/components/lab/demo-check';
 import { OpenRouterConnect } from '@/components/lab/openrouter-connect';
 import { Connections } from '@/components/lab/connections';
 import { ResultCard, type Result } from '@/components/lab/result-card';
-import { models, connectionFor, type Keys } from '@/lib/models';
+import {
+  models,
+  connectionFor,
+  PROXIED_CONNECTIONS,
+  type Keys,
+} from '@/lib/models';
 import {
   importVocabulary,
   parseVocabulary,
   rankTranscripts,
 } from '@/lib/comparison';
 import { prepareClip, downloadBlob, MAX_SECONDS, type Clip } from '@/lib/audio';
-import type {
-  TranscriptionOutput,
-  ProviderDiagnostics,
+import {
+  RequestError,
+  prepareAudio,
+  transcribe,
+  type PreparedAudio,
+  type TranscriptionOutput,
+  type ProviderDiagnostics,
 } from '@/lib/transcription';
 
 type Run = {
@@ -144,21 +154,21 @@ export default function Home() {
     [useVocabulary, setUseVocabulary] = useState(true),
     [english, setEnglish] = useState(true),
     [reference, setReference] = useState('');
-  const [settingsLoaded, setSettingsLoaded] = useState(false);
-  useEffect(() => {
-    const saved = readSettings(localStorage);
-    const known = new Set(models.map((m) => m.id));
-    if (saved.selected)
-      setSelected(saved.selected.filter((id) => known.has(id)));
-    if (saved.english !== undefined) setEnglish(saved.english);
-    if (saved.useVocabulary !== undefined)
-      setUseVocabulary(saved.useVocabulary);
-    setSettingsLoaded(true);
-  }, []);
-  useEffect(() => {
-    if (settingsLoaded)
-      writeSettings(localStorage, { selected, english, useVocabulary });
-  }, [settingsLoaded, selected, english, useVocabulary]);
+  function persistSettings(patch: Partial<Settings>) {
+    writeSettings(localStorage, { selected, english, useVocabulary, ...patch });
+  }
+  const chooseModels = (next: string[]) => {
+    setSelected(next);
+    persistSettings({ selected: next });
+  };
+  const chooseEnglish = (next: boolean) => {
+    setEnglish(next);
+    persistSettings({ english: next });
+  };
+  const chooseVocabulary = (next: boolean) => {
+    setUseVocabulary(next);
+    persistSettings({ useVocabulary: next });
+  };
   const [vocabularyStorageError, setVocabularyStorageError] = useState('');
   const [vocabularySaved, setVocabularySaved] = useState(false);
   useEffect(() => {
@@ -168,6 +178,13 @@ export default function Home() {
         setVocabularyValue(saved);
         setVocabularySaved(true);
       }
+      const settings = readSettings(localStorage);
+      const known = new Set(models.map((m) => m.id));
+      if (settings.selected)
+        setSelected(settings.selected.filter((id) => known.has(id)));
+      if (settings.english !== undefined) setEnglish(settings.english);
+      if (settings.useVocabulary !== undefined)
+        setUseVocabulary(settings.useVocabulary);
     } catch {
       setVocabularyStorageError(
         'Could not restore vocabulary from this browser.',
@@ -310,7 +327,7 @@ export default function Home() {
       const terms = importVocabulary(await file.text());
       if (!terms.length) throw new Error('No dictionary entries found.');
       setVocabulary(terms.join('\n'));
-      setUseVocabulary(true);
+      chooseVocabulary(true);
       setError('');
     } catch (e) {
       setError(
@@ -421,7 +438,11 @@ export default function Home() {
       setPreparing(false);
     }
   }
-  async function send(run: Run, id: string) {
+  const preparedFor = (run: Run) =>
+    run.clip.blob
+      .arrayBuffer()
+      .then((buffer) => prepareAudio(new Uint8Array(buffer)));
+  async function send(run: Run, id: string, prepared: PreparedAudio) {
     const m = models.find((x) => x.id === id)!,
       connection = connectionFor(m, keys),
       key = keys[connection]?.trim();
@@ -446,45 +467,70 @@ export default function Home() {
       note: undefined,
     });
     try {
-      const response = await fetch('/api/transcribe', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id,
-          connection,
-          key,
-          audio: run.clip.base64,
-          vocabulary: run.terms,
-          english: run.english,
-        }),
-        signal: controller.signal,
-      });
-      const data = await readApiResponse<
-        TranscriptionOutput & {
-          error?: string;
-          diagnostics?: ProviderDiagnostics;
-        }
-      >(response);
-      if (!response.ok) {
-        updateResult(run.id, id, {
-          status: 'error',
-          error: data.error || 'The provider request failed.',
-          diagnostics: data.diagnostics,
+      const input = {
+        id,
+        connection,
+        key,
+        audio: run.clip.base64,
+        vocabulary: run.terms,
+        english: run.english,
+      };
+      let output: TranscriptionOutput;
+      if (PROXIED_CONNECTIONS.includes(connection)) {
+        const response = await fetch('/api/transcribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(input),
+          signal: controller.signal,
         });
-        return;
+        const data = await readApiResponse<
+          TranscriptionOutput & {
+            error?: string;
+            diagnostics?: ProviderDiagnostics;
+          }
+        >(response);
+        if (!response.ok) {
+          updateResult(run.id, id, {
+            status: 'error',
+            error: data.error || 'The provider request failed.',
+            diagnostics: data.diagnostics,
+          });
+          return;
+        }
+        output = data;
+      } else {
+        // Straight from the browser to the provider; audio and key never touch Voxbench.
+        output = await transcribe(
+          input,
+          AbortSignal.any([controller.signal, AbortSignal.timeout(150_000)]),
+          fetch,
+          prepared,
+        );
       }
-      const output = data as TranscriptionOutput;
       if (output.audioHash !== run.clip.hash)
         throw new Error('Audio verification failed. Please retry this model.');
       updateResult(run.id, id, { status: 'done', output });
     } catch (e) {
+      if (e instanceof RequestError) {
+        updateResult(run.id, id, {
+          status: 'error',
+          error: e.message,
+          diagnostics: e.diagnostics,
+        });
+        return;
+      }
+      const stopped =
+        controller.signal.aborted ||
+        (e instanceof Error && ['AbortError', 'TimeoutError'].includes(e.name));
       updateResult(run.id, id, {
         status: controller.signal.aborted ? 'cancelled' : 'error',
-        error: controller.signal.aborted
-          ? 'Stopped. Audio already received by the provider may still be billed.'
-          : e instanceof Error
-            ? e.message
-            : 'The provider could not be reached.',
+        error: stopped
+          ? 'Stopped or timed out. Audio already received by the provider may still be billed.'
+          : e instanceof TypeError
+            ? 'Could not reach the provider. Check your connection and try again.'
+            : e instanceof Error
+              ? e.message
+              : 'The provider could not be reached.',
       });
     } finally {
       controllers.current = controllers.current.filter((c) => c !== controller);
@@ -604,11 +650,12 @@ export default function Home() {
     }
     const queue = [...chosen];
     try {
+      const prepared = await preparedFor(run);
       await Promise.all(
         Array.from({ length: 3 }, async () => {
           while (queue.length && !cancelled.current) {
             const id = queue.shift()!;
-            await send(run, id);
+            await send(run, id, prepared);
           }
         }),
       );
@@ -631,7 +678,7 @@ export default function Home() {
     setBusy(true);
     cancelled.current = false;
     try {
-      await send(run, id);
+      await send(run, id, await preparedFor(run));
     } finally {
       busyRef.current = false;
       setBusy(false);
@@ -924,7 +971,7 @@ export default function Home() {
                     <Checkbox
                       id="use-vocabulary"
                       checked={useVocabulary}
-                      onCheckedChange={(v) => setUseVocabulary(!!v)}
+                      onCheckedChange={(v) => chooseVocabulary(!!v)}
                       disabled={busy}
                     />
                     Send vocabulary hints
@@ -975,7 +1022,7 @@ export default function Home() {
                   <Checkbox
                     id="english-language"
                     checked={english}
-                    onCheckedChange={(v) => setEnglish(!!v)}
+                    onCheckedChange={(v) => chooseEnglish(!!v)}
                     disabled={busy}
                   />
                   English <small>Uncheck to auto-detect language</small>
@@ -989,7 +1036,7 @@ export default function Home() {
                 className="text-button"
                 disabled={busy || mode === 'free'}
                 onClick={() =>
-                  setSelected(
+                  chooseModels(
                     ready === available.length && ready > 0
                       ? []
                       : models.map((m) => m.id),
@@ -1026,10 +1073,10 @@ export default function Home() {
                           id={'model-' + m.id}
                           checked={hasKey && selected.includes(m.id)}
                           onCheckedChange={(checked) =>
-                            setSelected((old) =>
+                            chooseModels(
                               checked
-                                ? [...old, m.id]
-                                : old.filter((id) => id !== m.id),
+                                ? [...selected, m.id]
+                                : selected.filter((id) => id !== m.id),
                             )
                           }
                           disabled={busy || !hasKey}
@@ -1283,9 +1330,10 @@ export default function Home() {
       <footer>
         <a href="/privacy">Privacy</a>
         <span>
-          Keys and vocabulary stay in this browser. Audio and keys pass through
-          Voxbench to the providers you choose; their data policies apply. We
-          log errors only.
+          Keys and vocabulary stay in this browser. With your own keys, audio
+          goes straight from your browser to each provider; free-trial audio
+          passes through Voxbench. Provider data policies apply. We log errors
+          only.
         </span>
         <details>
           <summary>Model sources</summary>

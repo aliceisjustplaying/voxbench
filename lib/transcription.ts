@@ -1,4 +1,3 @@
-import { Buffer } from 'node:buffer';
 import { models, type Connection } from './models.ts';
 
 export type TranscriptionInput = {
@@ -110,14 +109,12 @@ export function validateInput(raw: unknown): TranscriptionInput {
     english: r.english,
   };
 }
-export function wavBytes(audio: string) {
-  const bytes = Buffer.from(audio, 'base64');
-  // Buffer's decoder is permissive: a native round trip rejects whitespace,
-  // URL-safe alphabets, bad padding and ignored characters without a JS regex.
-  if (bytes.toString('base64') !== audio)
-    throw new RequestError(
-      'Invalid audio encoding. Record or upload it again.',
-    );
+const hex = (bytes: ArrayBuffer | Uint8Array) =>
+  Array.from(new Uint8Array(bytes), (n) =>
+    n.toString(16).padStart(2, '0'),
+  ).join('');
+/** Validate a mono 16 kHz 16-bit WAV of 60 seconds or less. */
+export function validateWav(bytes: Uint8Array<ArrayBuffer>) {
   const v = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const word = (at: number, n: number) =>
     String.fromCharCode(...bytes.subarray(at, at + n));
@@ -142,6 +139,20 @@ export function wavBytes(audio: string) {
     throw new RequestError(
       'Audio must be a mono 16 kHz WAV, 60 seconds or less. Record or upload it again.',
     );
+  return bytes;
+}
+/** Browser-safe base64 decode; the server uses the faster Buffer path in wav.ts. */
+function decodeBase64(audio: string) {
+  let binary: string;
+  try {
+    binary = atob(audio);
+  } catch {
+    throw new RequestError(
+      'Invalid audio encoding. Record or upload it again.',
+    );
+  }
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
   return bytes;
 }
 function text(value: unknown): string {
@@ -193,10 +204,10 @@ function safeMessage(data: ProviderResponse, status: number, key: string) {
   return `${reason} (HTTP ${status}). ${detail.replaceAll(key, '[redacted]').slice(0, 700)}`.trim();
 }
 export async function prepareAudio(audio: string | Uint8Array<ArrayBuffer>) {
-  const bytes = typeof audio === 'string' ? wavBytes(audio) : audio;
-  const hash = Buffer.from(
-    await crypto.subtle.digest('SHA-256', bytes),
-  ).toString('hex');
+  const bytes = validateWav(
+    typeof audio === 'string' ? decodeBase64(audio) : audio,
+  );
+  const hash = hex(await crypto.subtle.digest('SHA-256', bytes));
   return { bytes, hash, blob: new Blob([bytes], { type: 'audio/wav' }) };
 }
 export type PreparedAudio = Awaited<ReturnType<typeof prepareAudio>>;
@@ -285,7 +296,8 @@ export async function transcribe(
         truncated: sanitized.length > 16000,
       };
       const message =
-        response.status >= 300 && response.status < 400
+        response.type === 'opaqueredirect' ||
+        (response.status >= 300 && response.status < 400)
           ? 'Provider redirected the request. No credentials were forwarded to the redirect destination.'
           : safeMessage(data, response.status, key);
       throw new RequestError(

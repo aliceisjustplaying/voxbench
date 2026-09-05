@@ -1,7 +1,8 @@
 import { Buffer } from 'node:buffer';
 import { networkGroup } from './network.ts';
 import type { AbuseControls } from './abuse-controls.ts';
-import { RequestError, validateInput, wavBytes } from './transcription.ts';
+import { RequestError, validateInput } from './transcription.ts';
+import { wavBytes } from './wav.ts';
 export const DEMO_MODELS = ['gpt', 'voxtral', 'mai'] as const;
 export const DEMO_SECONDS = 30;
 export const DEMO_DAILY_LIMIT = 200;

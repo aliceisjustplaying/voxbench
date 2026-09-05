@@ -9,6 +9,7 @@ import {
   validateInput,
   prepareAudio,
 } from './transcription.ts';
+import { wavBytes } from './wav.ts';
 import { readBoundedJson } from './request-body.ts';
 import { logFailure } from './logging.ts';
 export async function handleTranscription(
@@ -33,7 +34,7 @@ export async function handleTranscription(
     const input = validateInput(raw);
     apiKey = input.key;
     stage = 'audio';
-    const audio = await prepareAudio(input.audio);
+    const audio = await prepareAudio(wavBytes(input.audio));
     stage = 'key-limit';
     await checkProviderAccess(input.connection, input.key, env);
     stage = 'provider';

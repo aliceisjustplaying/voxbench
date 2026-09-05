@@ -14,13 +14,14 @@ export default function Privacy() {
       </p>
       <h2>Your recordings and transcripts</h2>
       <p>
-        When you compare, your audio and optional vocabulary pass through our
-        Cloudflare server to the selected speech-recognition providers. For the
-        free trial, those requests go through OpenRouter to OpenAI, Mistral and
-        Microsoft. We do not save audio, vocabulary or transcripts in our server
-        database. Providers apply their own processing and retention policies;
-        links to model documentation are available on the comparison page. Your
-        reference transcript is used only in your browser.
+        With your own keys, your browser sends audio and optional vocabulary
+        directly to each selected speech-recognition provider; nothing passes
+        through our server. For the free trial, requests go through our
+        Cloudflare server to OpenRouter and on to OpenAI, Mistral and Microsoft.
+        We do not save audio, vocabulary or transcripts. Providers apply their
+        own processing and retention policies; links to model documentation are
+        available on the comparison page. Your reference transcript is used only
+        in your browser.
       </p>
       <h2>Saved keys and browser data</h2>
       <p>

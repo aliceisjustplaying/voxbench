@@ -6,7 +6,7 @@ Record or upload audio, choose models, then compare their raw transcripts, timin
 
 ## Accounts and vocabulary
 
-You can supply provider API keys or connect an OpenRouter account. Keys and vocabulary are saved in this browser’s local storage, which is not an encrypted vault. Audio and the selected key pass through the server to the provider when you compare.
+You can supply provider API keys or connect an OpenRouter account. Keys and vocabulary are saved in this browser’s local storage, which is not an encrypted vault. With your own keys, the browser sends audio and the key directly to each provider; only the free trial goes through the Worker.
 
 A direct OpenAI key takes priority over OpenRouter for GPT Transcribe and enables vocabulary hints. GPT and Voxtral through OpenRouter do not receive custom vocabulary; MAI receives a phrase list. The model picker describes each connection’s support. Hints do not guarantee recognition.
 

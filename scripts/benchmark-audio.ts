@@ -1,4 +1,5 @@
-import { prepareAudio, validateInput, wavBytes } from '../lib/transcription.ts';
+import { prepareAudio, validateInput } from '../lib/transcription.ts';
+import { wavBytes } from '../lib/wav.ts';
 const iterations = 20;
 for (const seconds of [30, 60]) {
   const b = Buffer.alloc(44 + seconds * 32000);
@@ -23,14 +24,14 @@ for (const seconds of [30, 60]) {
       vocabulary: [],
       english: true,
     });
-  for (let n = 0; n < 3; n++) await prepareAudio(encoded);
+  for (let n = 0; n < 3; n++) await prepareAudio(wavBytes(encoded));
   const decodeStart = performance.now();
   for (let n = 0; n < iterations; n++) wavBytes(encoded);
   const decodeMs = (performance.now() - decodeStart) / iterations;
   const start = performance.now();
   for (let n = 0; n < iterations; n++) {
     const input = validateInput(JSON.parse(payload));
-    await prepareAudio(input.audio);
+    await prepareAudio(wavBytes(input.audio));
     JSON.stringify({
       model: 'openai/gpt-transcribe',
       input_audio: { data: input.audio, format: 'wav' },

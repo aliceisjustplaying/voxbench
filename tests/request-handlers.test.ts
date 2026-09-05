@@ -13,7 +13,8 @@ import {
   trialIdentity,
   type DemoEnv,
 } from '../lib/demo.ts';
-import { wavBytes, prepareAudio, transcribe } from '../lib/transcription.ts';
+import { prepareAudio, transcribe } from '../lib/transcription.ts';
+import { wavBytes } from '../lib/wav.ts';
 import { contentSecurityPolicy } from '../lib/security-headers.ts';
 
 function wav(seconds = 1) {
@@ -85,7 +86,7 @@ test('native decoder rejects noncanonical encoding and malformed WAV headers', (
   assert.equal(wavBytes(wav(60)).length, 1920044);
 });
 test('prepared audio is reused without decoding or hashing per model', async (t) => {
-  const prepared = await prepareAudio(raw.audio);
+  const prepared = await prepareAudio(wavBytes(raw.audio));
   t.mock.method(crypto.subtle, 'digest', () => {
     throw new Error('Unexpected second hash');
   });
