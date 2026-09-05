@@ -73,6 +73,12 @@ export default function Home() {
   }, []);
   const [keys, setKeys] = useState<Keys>({}),
     [keysOpen, setKeysOpen] = useState(false);
+  useEffect(() => {
+    // Covers manual entry, imports and OpenRouter's cross-tab OAuth callback.
+    // A deliberate later choice of Try free remains until the keys change.
+    if (Object.values(keys).some((key) => key?.trim().length >= 8))
+      setMode('own');
+  }, [keys]);
   const [keyStorageStatus, setKeyStorageStatus] = useState(
     'Loading saved keys…',
   );
@@ -652,37 +658,69 @@ export default function Home() {
           <strong>Your accent is the test.</strong>
         </span>
       </section>
-      <div className="access-bar">
-        {demo.available && (
-          <Tabs
-            value={mode}
-            onValueChange={(v) => {
-              if (!busy && !recording) {
-                setMode(v as 'free' | 'own');
+      <section
+        className="access-bar"
+        aria-label="Choose how to pay for comparisons"
+      >
+        <div className="section-label">HOW DO YOU WANT TO COMPARE?</div>
+        <div className="access-choices">
+          {demo.available && (
+            <button
+              type="button"
+              className="access-choice"
+              aria-pressed={mode === 'free'}
+              disabled={busy || recording}
+              onClick={() => {
+                setMode('free');
                 setDemoToken('');
                 setDemoReset((n) => n + 1);
-              }
+              }}
+            >
+              <span className="access-choice-heading">
+                <strong>Free trial</strong>
+                <span className="access-choice-state">
+                  {mode === 'free' ? '✓ Selected' : 'Choose free trial'}
+                </span>
+              </span>
+              <span>Voxbench pays</span>
+              <small>
+                {demo.remaining ?? 0} comparisons left · 30-second clips
+                <br />
+                GPT, Voxtral &amp; MAI
+              </small>
+            </button>
+          )}
+          <button
+            type="button"
+            className="access-choice"
+            aria-pressed={mode === 'own'}
+            disabled={busy || recording}
+            onClick={() => {
+              setMode('own');
+              setDemoToken('');
             }}
           >
-            <TabsList>
-              <TabsTrigger value="free" disabled={busy || recording}>
-                Try free
-              </TabsTrigger>
-              <TabsTrigger value="own" disabled={busy || recording}>
-                Use my keys
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
-        )}
-        {mode === 'free' ? (
-          <p>
-            {demo.remaining ?? 0} free comparisons left · 30 seconds each · GPT,
-            Voxtral &amp; MAI
-          </p>
-        ) : (
-          <OpenRouterConnect />
-        )}
-      </div>
+            <span className="access-choice-heading">
+              <strong>Use my API keys</strong>
+              <span className="access-choice-state">
+                {mode === 'own' ? '✓ Selected' : 'Choose my keys'}
+              </span>
+            </span>
+            <span>Your provider accounts pay</span>
+            <small>
+              All 11 models · 60-second clips
+              <br />
+              Vocabulary support depends on the model and connection
+            </small>
+          </button>
+        </div>
+        <p className="access-current" role="status">
+          {mode === 'free'
+            ? 'Free trial selected. This comparison uses Voxbench’s balance.'
+            : 'Your API keys selected. Comparisons are billed to your provider accounts.'}
+        </p>
+        {mode === 'own' && <OpenRouterConnect />}
+      </section>
       <section className="workspace">
         <div className="capture">
           <div className="section-label">01 — THE RECORDING</div>
@@ -959,7 +997,7 @@ export default function Home() {
                 {mode === 'free'
                   ? 'Compare for free'
                   : ready
-                    ? 'Compare this take'
+                    ? 'Compare using my keys'
                     : 'Add keys to compare'}
                 <ArrowUpRight />
               </Button>

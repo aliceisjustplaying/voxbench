@@ -1156,14 +1156,71 @@ summary:focus-visible {
   }
 }
 .access-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  flex-wrap: wrap;
-  margin-bottom: 20px;
+  margin-bottom: 28px;
 }
-.access-bar p,
+.access-choices {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+  gap: 14px;
+  margin: 10px 0 12px;
+}
+.access-choice {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-align: left;
+  padding: 20px;
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  background: #fff;
+  color: var(--foreground);
+  cursor: pointer;
+}
+.access-choice[aria-pressed='true'] {
+  border-color: var(--primary);
+  background: #eef2ff;
+  box-shadow: 0 0 0 1px var(--primary);
+}
+.access-choice:focus-visible {
+  outline: 3px solid var(--primary);
+  outline-offset: 4px;
+}
+.access-choice:disabled {
+  cursor: default;
+}
+.access-choice-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.access-choice-heading strong {
+  font-size: 21px;
+}
+.access-choice-state {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted-foreground);
+}
+.access-choice[aria-pressed='true'] .access-choice-state {
+  color: #fff;
+  background: var(--primary);
+  border-radius: 20px;
+  padding: 4px 10px;
+}
+.access-choice > span:nth-child(2) {
+  font-weight: 600;
+}
+.access-choice small {
+  color: var(--muted-foreground);
+  font-size: 14px;
+}
+.access-current {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0 0 14px;
+}
 .openrouter-connect p {
   color: var(--muted-foreground);
   font-size: 14px;
@@ -1188,18 +1245,6 @@ summary:focus-visible {
   color: #a32435;
 }
 @media (max-width: 720px) {
-  .access-bar {
-    align-items: stretch;
-    flex-direction: column;
-  }
-  .access-bar [data-slot='tabs-list'] {
-    width: 100%;
-    min-height: 44px;
-  }
-  .access-bar [data-slot='tabs-trigger'] {
-    flex: 1;
-    min-height: 40px;
-  }
   .openrouter-connect {
     gap: 6px;
   }
