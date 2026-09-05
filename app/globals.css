@@ -14,8 +14,8 @@
   --color-destructive: #bd2439;
   --color-popover: #fff;
   --color-popover-foreground: #151c2c;
-  --color-accent: #e8edff;
-  --color-accent-foreground: #182fa8;
+  --color-accent: color-mix(in oklab, var(--primary) 10%, white);
+  --color-accent-foreground: color-mix(in oklab, var(--primary) 85%, black);
   --radius-lg: 10px;
   --radius-md: 7px;
   --radius-sm: 5px;
@@ -23,7 +23,7 @@
 :root {
   --background: #fff;
   --foreground: #151c2c;
-  --primary: #2447ef;
+  --primary: #1d6b45;
   --primary-foreground: #fff;
   --muted: #edf0f6;
   --muted-foreground: #566178;
@@ -135,7 +135,7 @@ header {
   display: grid;
   place-items: center;
   margin: 12px auto;
-  box-shadow: 0 0 0 12px #e2e8ff;
+  box-shadow: 0 0 0 12px color-mix(in oklab, var(--primary) 14%, white);
 }
 .capture p {
   color: var(--muted-foreground);
@@ -258,7 +258,7 @@ h2 {
 }
 .vocab {
   margin-top: 14px;
-  border-top: 1px solid #d4dcf8;
+  border-top: 1px solid var(--border);
   padding-top: 12px;
   text-align: left;
 }
@@ -379,7 +379,7 @@ textarea:disabled {
   margin-left: auto;
 }
 .key-dot.present {
-  background: #258454;
+  background: var(--primary);
 }
 .compare-bar {
   display: flex;
@@ -537,8 +537,8 @@ textarea:disabled {
   color: #637087;
 }
 .state.done {
-  background: #e7f4ed;
-  color: #226b44;
+  background: color-mix(in oklab, var(--primary) 10%, white);
+  color: var(--primary);
 }
 .state.error,
 .state.cancelled {
@@ -547,7 +547,7 @@ textarea:disabled {
 }
 .state.running {
   color: var(--primary);
-  background: #eef1ff;
+  background: color-mix(in oklab, var(--primary) 10%, white);
 }
 .result-stats {
   display: grid;
