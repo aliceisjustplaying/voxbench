@@ -695,13 +695,7 @@ export default function Home() {
                 setDemoReset((n) => n + 1);
               }}
             >
-              <span className="access-choice-heading">
-                <strong>Free trial</strong>
-              </span>
-              <small>
-                {demo.remaining ?? 0} left · up to 30 seconds · GPT, Voxtral and
-                MAI
-              </small>
+              Free trial · {demo.remaining ?? 0} left
             </button>
             <button
               type="button"
@@ -713,18 +707,15 @@ export default function Home() {
                 setDemoToken('');
               }}
             >
-              <span className="access-choice-heading">
-                <strong>My API keys</strong>
-              </span>
-              <small>All 11 models · up to 60 seconds</small>
+              My API keys
             </button>
           </div>
         )}
         {demo.available && (
           <p className="access-current" role="status">
             {mode === 'free'
-              ? 'Free trial selected — Voxbench pays.'
-              : 'Your keys selected — providers bill you.'}
+              ? 'GPT, Voxtral and MAI · up to 30 seconds · Voxbench pays.'
+              : 'All 11 models · up to 60 seconds · providers bill you.'}
           </p>
         )}
         {mode === 'own' && <OpenRouterConnect />}
