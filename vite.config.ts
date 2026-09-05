@@ -15,6 +15,18 @@ const isCodexSeatbeltSandbox = process.env.CODEX_SANDBOX === 'seatbelt';
 
 const localBindingConfig = {
   main: 'vinext/server/fetch-handler',
+  ratelimits: [
+    {
+      name: 'IP_RATE_LIMITER',
+      namespace_id: '2609051601',
+      simple: { limit: 60, period: 60 as const },
+    },
+    {
+      name: 'KEY_RATE_LIMITER',
+      namespace_id: '2609051602',
+      simple: { limit: 120, period: 60 as const },
+    },
+  ],
   compatibility_flags: ['nodejs_compat'],
   d1_databases: d1
     ? [

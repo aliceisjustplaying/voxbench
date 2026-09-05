@@ -3,10 +3,44 @@
   "account_id": "b752c979e541327de3e87e52f0906aa1",
   "main": "dist/server/index.js",
   "compatibility_date": "2026-05-15",
-  "compatibility_flags": ["nodejs_compat"],
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
   "no_bundle": true,
-  "rules": [{ "type": "ESModule", "globs": ["**/*.js", "**/*.mjs"] }],
-  "assets": { "directory": "dist/client" },
-  "observability": { "enabled": true },
-  "workers_dev": true
+  "rules": [
+    {
+      "type": "ESModule",
+      "globs": [
+        "**/*.js",
+        "**/*.mjs"
+      ]
+    }
+  ],
+  "assets": {
+    "directory": "dist/client"
+  },
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 0.1
+  },
+  "workers_dev": true,
+  "keep_vars": true,
+  "ratelimits": [
+    {
+      "name": "IP_RATE_LIMITER",
+      "namespace_id": "2609051601",
+      "simple": {
+        "limit": 60,
+        "period": 60
+      }
+    },
+    {
+      "name": "KEY_RATE_LIMITER",
+      "namespace_id": "2609051602",
+      "simple": {
+        "limit": 120,
+        "period": 60
+      }
+    }
+  ]
 }

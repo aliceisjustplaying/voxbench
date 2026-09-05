@@ -897,9 +897,10 @@ export default function Home() {
       </section>
       <footer>
         <span>
-          Keys and vocabulary are saved in this browser. Audio and results are
-          not saved; export them before closing. Selected providers receive
-          audio and apply their own data policies.
+          Keys and vocabulary are saved in this browser. Audio, keys and
+          optional vocabulary pass through our server to selected providers;
+          their data policies apply. We keep operational logs, not audio or
+          keys. Export results before closing.
         </span>
         <details>
           <summary>Model sources · checked 5 Sep 2026</summary>
