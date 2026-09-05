@@ -67,10 +67,32 @@ export default function Home() {
     [recording, setRecording] = useState(false),
     [preparing, setPreparing] = useState(false),
     [elapsed, setElapsed] = useState(0);
-  const [vocabulary, setVocabulary] = useState(''),
+  const [vocabulary, setVocabularyValue] = useState(''),
     [useVocabulary, setUseVocabulary] = useState(true),
     [english, setEnglish] = useState(true),
     [reference, setReference] = useState('');
+  const [vocabularyStorageError, setVocabularyStorageError] = useState('');
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('voice-lab-vocabulary-v1');
+      if (saved !== null) setVocabularyValue(saved);
+    } catch {
+      setVocabularyStorageError(
+        'Could not restore vocabulary from this browser.',
+      );
+    }
+  }, []);
+  function setVocabulary(value: string) {
+    setVocabularyValue(value);
+    try {
+      localStorage.setItem('voice-lab-vocabulary-v1', value);
+      setVocabularyStorageError('');
+    } catch {
+      setVocabularyStorageError(
+        'Could not save vocabulary. Copy it before refreshing.',
+      );
+    }
+  }
   const [runs, setRuns] = useState<Run[]>([]),
     [activeId, setActiveId] = useState(''),
     [busy, setBusy] = useState(false),
@@ -571,9 +593,13 @@ export default function Home() {
               onChange={(e) => setVocabulary(e.target.value)}
               disabled={busy}
             />
+            {vocabularyStorageError && (
+              <p role="alert">{vocabularyStorageError}</p>
+            )}
             <div className="dictionary-import">
               <small>
-                One term per line. Hint support varies by connection.
+                Saved in this browser. One term per line. Hint support varies by
+                connection.
               </small>
               <button
                 disabled={busy}
