@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 const description =
-  'Record a take and read 11 speech-to-text transcripts side by side. Three models free, all eleven with your own keys.';
+  'Record a take and read 11 speech-to-text transcripts side by side. Try three free, run all eleven with your own keys.';
 export const metadata: Metadata = {
   metadataBase: new URL('https://voxbench.app'),
   title: 'Voxbench — which speech-to-text model hears you best?',
@@ -31,7 +31,7 @@ export const metadata: Metadata = {
         url: '/og.png',
         width: 1200,
         height: 630,
-        alt: 'Voxbench: which speech-to-text model hears you best? Eleven models, three free.',
+        alt: 'Voxbench: which speech-to-text model hears you best? Eleven models, three free to try.',
       },
     ],
   },
