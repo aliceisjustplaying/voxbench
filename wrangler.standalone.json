@@ -21,7 +21,8 @@
   },
   "observability": {
     "enabled": true,
-    "head_sampling_rate": 0.1
+    "head_sampling_rate": 0.1,
+    "redact_query_string": true
   },
   "workers_dev": true,
   "keep_vars": true,
@@ -42,5 +43,15 @@
         "period": 60
       }
     }
-  ]
+  ],
+  "d1_databases": [
+    {
+      "binding": "DEMO_DB",
+      "database_name": "voxbench-demo",
+      "database_id": "68b26a02-2ca5-49a4-afc3-b3f6f4b198aa"
+    }
+  ],
+  "vars": {
+    "DEMO_ENABLED": "true"
+  }
 }

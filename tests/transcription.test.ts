@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { transcribe, validateInput } from '../lib/transcription.ts';
+import { connectionFor, models } from '../lib/models.ts';
 import type { TranscriptionInput } from '../lib/transcription.ts';
 function audio() {
   const b = Buffer.alloc(32044);
@@ -103,7 +104,7 @@ test('Gemini requests verbatim mode, includes vocabulary and rejects incomplete 
     /did not complete/,
   );
 });
-test('OpenRouter passes keywords under provider options and reports actual returned cost', async () => {
+test('OpenRouter reports returned cost and discloses unavailable GPT vocabulary', async () => {
   const out = await transcribe(
     { ...base, id: 'gpt', connection: 'openrouter' },
     new AbortController().signal,
@@ -112,12 +113,12 @@ test('OpenRouter passes keywords under provider options and reports actual retur
       assert.equal(b.model, 'openai/gpt-transcribe');
       assert.equal(b.input_audio.data, base.audio);
       assert.equal(b.prompt, undefined);
-      assert.deepEqual(b.provider.options.openai.keywords, ['Codex']);
+      assert.equal(b.provider, undefined);
       return ok({ text: 'Hi', usage: { cost: 0.001 } });
     },
   );
   assert.equal(out.cost, 0.001);
-  assert.match(out.hints, /unverified/);
+  assert.match(out.hints, /no custom vocabulary/);
 });
 test('ElevenLabs submits multipart keyterms and identical WAV', async () => {
   await transcribe(
@@ -319,5 +320,64 @@ test('non-JSON provider failures retain readable diagnostic details', async () =
       assert.equal((error as any).diagnostics.response, 'backend unavailable');
       return true;
     },
+  );
+});
+
+test('OpenRouter only sends supported MAI vocabulary; GPT and Voxtral disclose no support', async () => {
+  for (const id of ['gpt', 'voxtral', 'mai']) {
+    const out = await transcribe(
+      { ...base, id, connection: 'openrouter' },
+      new AbortController().signal,
+      async (_url, init) => {
+        const body = JSON.parse(String(init?.body));
+        assert.deepEqual(
+          body.provider,
+          id === 'mai'
+            ? {
+                options: {
+                  azure: { phraseList: { phrases: base.vocabulary } },
+                },
+              }
+            : undefined,
+        );
+        return ok({ text: 'Codex' });
+      },
+    );
+    assert.equal(out.hints.startsWith('Not sent'), id !== 'mai');
+  }
+});
+test('Direct OpenAI sends exact WAV, keywords and plural languages with GPT Transcribe', async () => {
+  for (const english of [true, false]) {
+    const out = await transcribe(
+      validateInput({ ...base, id: 'gpt', connection: 'openai', english }),
+      new AbortController().signal,
+      async (url, init) => {
+        assert.equal(url, 'https://api.openai.com/v1/audio/transcriptions');
+        const form = init?.body as FormData;
+        assert.equal(form.get('model'), 'gpt-transcribe');
+        assert.deepEqual(form.getAll('keywords[]'), base.vocabulary);
+        assert.deepEqual(form.getAll('languages[]'), english ? ['en'] : []);
+        assert.equal(form.get('language'), null);
+        assert.deepEqual(
+          Buffer.from(await (form.get('file') as Blob).arrayBuffer()),
+          audio(),
+        );
+        return ok({ text: 'Codex' });
+      },
+    );
+    assert.equal(out.connection, 'openai');
+    assert.equal(out.hints, 'Keywords sent directly to OpenAI.');
+  }
+});
+
+test('OpenAI key takes priority while an absent or empty key keeps OpenRouter', () => {
+  const m = models.find((m) => m.id === 'gpt')!;
+  assert.equal(
+    connectionFor(m, { openai: 'direct-key', openrouter: 'router-key' }),
+    'openai',
+  );
+  assert.equal(
+    connectionFor(m, { openai: ' ', openrouter: 'router-key' }),
+    'openrouter',
   );
 });

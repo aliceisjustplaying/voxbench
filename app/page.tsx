@@ -22,6 +22,8 @@ import {
   VOCABULARY_STORAGE,
   saveVocabulary,
 } from '@/lib/key-storage';
+import { DemoCheck } from '@/components/lab/demo-check';
+import { OpenRouterConnect } from '@/components/lab/openrouter-connect';
 import { Connections } from '@/components/lab/connections';
 import { ResultCard, type Result } from '@/components/lab/result-card';
 import { models, connectionFor, type Keys } from '@/lib/models';
@@ -40,8 +42,34 @@ type Run = {
   english: boolean;
   reference: string;
   results: Result[];
+  sponsored?: boolean;
 };
+const FREE_MODELS = ['gpt', 'voxtral', 'mai'];
+type DemoStatus = { available: boolean; remaining?: number; siteKey?: string };
 export default function Home() {
+  const [mode, setMode] = useState<'free' | 'own'>('own');
+  const [demo, setDemo] = useState<DemoStatus>({ available: false });
+  const [demoToken, setDemoToken] = useState('');
+  const [demoReset, setDemoReset] = useState(0);
+  useEffect(() => {
+    void fetch('/api/demo')
+      .then((r) => r.json() as Promise<DemoStatus>)
+      .then((status: DemoStatus) => {
+        setDemo(status);
+        try {
+          if (
+            status.available &&
+            !Object.values(
+              parseKeys(localStorage.getItem(KEY_STORAGE) || '{}'),
+            ).some((k) => k?.trim())
+          )
+            setMode('free');
+        } catch {
+          /* Keep manual setup on storage errors. */
+        }
+      })
+      .catch(() => {});
+  }, []);
   const [keys, setKeys] = useState<Keys>({}),
     [keysOpen, setKeysOpen] = useState(false);
   const [keyStorageStatus, setKeyStorageStatus] = useState(
@@ -275,7 +303,7 @@ export default function Home() {
       timer.current = setInterval(() => {
         const sec = (Date.now() - began) / 1000;
         setElapsed(sec);
-        if (sec >= MAX_SECONDS) stopRecording();
+        if (sec >= (mode === 'free' ? 29.5 : MAX_SECONDS)) stopRecording();
       }, 100);
     } catch (e) {
       stream.current?.getTracks().forEach((t) => t.stop());
@@ -359,9 +387,23 @@ export default function Home() {
     }
   }
   async function compare() {
-    if (!clip || !selected.length || busyRef.current) return;
-    if (!ready) {
+    if (!clip || (mode === 'own' && !selected.length) || busyRef.current)
+      return;
+    if (mode === 'own' && !ready) {
       setKeysOpen(true);
+      return;
+    }
+    if (
+      mode === 'free' &&
+      (clip.duration > 30 || !demoToken || !demo.remaining)
+    ) {
+      setError(
+        clip.duration > 30
+          ? 'Free comparisons use clips of 30 seconds or less.'
+          : !demo.remaining
+            ? 'Your free trials have been used. Connect OpenRouter or add your own key.'
+            : 'Complete the verification checkbox before comparing.',
+      );
       return;
     }
     const terms = useVocabulary ? parseVocabulary(vocabulary) : [];
@@ -385,13 +427,71 @@ export default function Home() {
       terms,
       english,
       reference,
-      results: selected.map((id) => ({ id, status: 'queued' })),
+      sponsored: mode === 'free',
+      results: (mode === 'free' ? FREE_MODELS : selected).map((id) => ({
+        id,
+        status: 'queued',
+      })),
     };
     setRuns((old) => [run, ...old]);
     setActiveId(run.id);
     busyRef.current = true;
     setBusy(true);
     cancelled.current = false;
+    if (mode === 'free') {
+      const controller = new AbortController();
+      controllers.current.push(controller);
+      for (const id of FREE_MODELS)
+        updateResult(run.id, id, { status: 'running' });
+      try {
+        const response = await fetch('/api/demo', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            audio: clip.base64,
+            vocabulary: terms,
+            english,
+            token: demoToken,
+          }),
+          signal: controller.signal,
+        });
+        const data = (await response.json()) as {
+          results?: Result[];
+          remaining?: number;
+          error?: string;
+        };
+        if (!response.ok || !data.results)
+          throw new Error(
+            data.error || 'The free comparison could not finish.',
+          );
+        for (const result of data.results) {
+          if (result.output && result.output.audioHash !== clip.hash)
+            throw new Error('Audio verification failed.');
+          updateResult(run.id, result.id, result);
+        }
+        setDemo((old) => ({ ...old, remaining: data.remaining }));
+      } catch (e) {
+        for (const id of FREE_MODELS)
+          updateResult(run.id, id, {
+            status: controller.signal.aborted ? 'cancelled' : 'error',
+            error:
+              e instanceof Error ? e.message : 'The free comparison failed.',
+          });
+      } finally {
+        controllers.current = controllers.current.filter(
+          (c) => c !== controller,
+        );
+        setDemoToken('');
+        setDemoReset((n) => n + 1);
+        void fetch('/api/demo')
+          .then((r) => r.json() as Promise<DemoStatus>)
+          .then(setDemo)
+          .catch(() => {});
+        busyRef.current = false;
+        setBusy(false);
+      }
+      return;
+    }
     const queue = [...selected];
     try {
       await Promise.all(
@@ -412,6 +512,11 @@ export default function Home() {
   }
   async function retry(run: Run, id: string) {
     if (busyRef.current) return;
+    if (run.sponsored) {
+      setMode('own');
+      setKeysOpen(true);
+      return;
+    }
     busyRef.current = true;
     setBusy(true);
     cancelled.current = false;
@@ -537,6 +642,37 @@ export default function Home() {
           <strong>Your accent is the test.</strong>
         </span>
       </section>
+      <div className="access-bar">
+        {demo.available && (
+          <Tabs
+            value={mode}
+            onValueChange={(v) => {
+              if (!busy && !recording) {
+                setMode(v as 'free' | 'own');
+                setDemoToken('');
+                setDemoReset((n) => n + 1);
+              }
+            }}
+          >
+            <TabsList>
+              <TabsTrigger value="free" disabled={busy || recording}>
+                Try free
+              </TabsTrigger>
+              <TabsTrigger value="own" disabled={busy || recording}>
+                Use my keys
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+        )}
+        {mode === 'free' ? (
+          <p>
+            {demo.remaining ?? 0} free comparisons left · 30 seconds each · GPT,
+            Voxtral &amp; MAI
+          </p>
+        ) : (
+          <OpenRouterConnect />
+        )}
+      </div>
       <section className="workspace">
         <div className="capture">
           <div className="section-label">01 — THE RECORDING</div>
@@ -561,7 +697,9 @@ export default function Home() {
               ? `${Math.floor(elapsed / 60)}:${String(Math.floor(elapsed % 60)).padStart(2, '0')}`
               : clip
                 ? `${clip.duration.toFixed(1)} seconds`
-                : 'Up to 60 seconds'}
+                : mode === 'free'
+                  ? 'Up to 30 seconds'
+                  : 'Up to 60 seconds'}
           </div>
           <div className="record-actions">
             <Button
@@ -695,7 +833,7 @@ export default function Home() {
             <h2>Who’s listening?</h2>
             <button
               className="text-button"
-              disabled={busy}
+              disabled={busy || mode === 'free'}
               onClick={() =>
                 setSelected(
                   selected.length === models.length
@@ -704,54 +842,91 @@ export default function Home() {
                 )
               }
             >
-              {selected.length === models.length
-                ? 'Deselect all'
-                : 'Select all'}
+              {mode === 'free'
+                ? 'Free trio'
+                : selected.length === models.length
+                  ? 'Deselect all'
+                  : 'Select all'}
             </button>
           </div>
           <div className="model-grid">
-            {models.map((m) => {
-              const c = connectionFor(m, keys),
-                hasKey = !!keys[c]?.trim();
-              return (
-                <label
-                  className={
-                    'model-choice ' + (selected.includes(m.id) ? 'chosen' : '')
-                  }
-                  key={m.id}
-                >
-                  <Checkbox
-                    checked={selected.includes(m.id)}
-                    onCheckedChange={(checked) =>
-                      setSelected((old) =>
-                        checked
-                          ? [...old, m.id]
-                          : old.filter((id) => id !== m.id),
-                      )
+            {models
+              .filter((m) => mode === 'own' || FREE_MODELS.includes(m.id))
+              .map((m) => {
+                const c =
+                    mode === 'free' ? m.connection : connectionFor(m, keys),
+                  hasKey = !!keys[c]?.trim();
+                return (
+                  <label
+                    className={
+                      'model-choice ' +
+                      (mode === 'free' || selected.includes(m.id)
+                        ? 'chosen'
+                        : '')
                     }
-                    disabled={busy}
-                  />
-                  <span className="model-details">
-                    <strong>{m.name}</strong>
-                    <span className="model-meta">
-                      {m.maker} · {c === 'openrouter' ? 'OpenRouter' : 'Direct'}
+                    key={m.id}
+                  >
+                    <Checkbox
+                      checked={mode === 'free' || selected.includes(m.id)}
+                      onCheckedChange={(checked) =>
+                        setSelected((old) =>
+                          checked
+                            ? [...old, m.id]
+                            : old.filter((id) => id !== m.id),
+                        )
+                      }
+                      disabled={busy || mode === 'free'}
+                    />
+                    <span className="model-details">
+                      <strong>{m.name}</strong>
+                      <span className="model-meta">
+                        {m.maker} ·{' '}
+                        {c === 'openrouter' ? 'OpenRouter' : 'Direct'}
+                      </span>
+                      <small>
+                        {m.id === 'gpt'
+                          ? c === 'openai'
+                            ? 'Custom vocabulary · your OpenAI key'
+                            : 'No custom vocabulary via OpenRouter · add an OpenAI key to enable'
+                          : m.vocabulary}
+                      </small>
                     </span>
-                    <small>{m.vocabulary}</small>
-                  </span>
-                  <span
-                    className={'key-dot ' + (hasKey ? 'present' : '')}
-                    title={
-                      hasKey ? 'Key entered; not yet verified' : 'Key needed'
-                    }
-                  />
-                </label>
-              );
-            })}
+                    <span
+                      className={
+                        'key-dot ' +
+                        (mode === 'free' || hasKey ? 'present' : '')
+                      }
+                      title={
+                        mode === 'free'
+                          ? 'Included in your free comparison'
+                          : hasKey
+                            ? 'Key entered; not yet verified'
+                            : 'Key needed'
+                      }
+                    />
+                  </label>
+                );
+              })}
           </div>
+          {mode === 'free' && demo.siteKey && !!demo.remaining && (
+            <DemoCheck
+              siteKey={demo.siteKey}
+              reset={demoReset}
+              onToken={setDemoToken}
+            />
+          )}
           <div className="compare-bar">
             <div>
-              <strong>{selected.length} selected</strong>
-              <span>{ready} with keys entered</span>
+              <strong>
+                {mode === 'free'
+                  ? '3 models included'
+                  : `${selected.length} selected`}
+              </strong>
+              <span>
+                {mode === 'free'
+                  ? `${demo.remaining ?? 0} free comparisons left`
+                  : `${ready} with keys entered`}
+              </span>
             </div>
             {busy ? (
               <Button variant="outline" onClick={cancel}>
@@ -760,19 +935,30 @@ export default function Home() {
               </Button>
             ) : (
               <Button
-                disabled={!clip || preparing || recording || !selected.length}
+                disabled={
+                  !clip ||
+                  preparing ||
+                  recording ||
+                  (mode === 'free'
+                    ? !demoToken || !demo.remaining
+                    : !selected.length)
+                }
                 onClick={compare}
               >
                 <Play />
-                {ready ? 'Compare this take' : 'Add keys to compare'}
+                {mode === 'free'
+                  ? 'Compare for free'
+                  : ready
+                    ? 'Compare this take'
+                    : 'Add keys to compare'}
                 <ArrowUpRight />
               </Button>
             )}
           </div>
           <p className="billing-note">
-            Compare sends audio to the selected providers with keys. Each
-            request is billed by that provider. Missing keys are shown as
-            skipped.
+            {mode === 'free'
+              ? 'Voxbench pays for this comparison. Each attempt uses one free trial, including provider failures. A shared-network limit also applies.'
+              : 'Compare sends audio to the selected providers with keys. Each request is billed by that provider. Missing keys are shown as skipped.'}
           </p>
         </div>
       </section>

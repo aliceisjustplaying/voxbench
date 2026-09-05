@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { OpenRouterConnect } from './openrouter-connect';
 import { parseKeys } from '@/lib/key-storage';
 import { Button } from '@/components/ui/button';
 import {
@@ -52,6 +53,7 @@ export function Connections({
             when you compare.
           </DialogDescription>
         </DialogHeader>
+        <OpenRouterConnect />
         <p role="status">{storageStatus}</p>
         <div className="key-transfer-actions">
           <Button

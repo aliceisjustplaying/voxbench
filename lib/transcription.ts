@@ -74,7 +74,7 @@ export function validateInput(raw: unknown): TranscriptionInput {
         typeof s !== 'string' ||
         s.length > 49 ||
         s.trim().split(/\s+/).length > 5 ||
-        /[<>{}\[\]\\]/.test(s),
+        /[\r\n<>{}\[\]\\]/.test(s),
     )
   )
     throw new RequestError(
@@ -93,7 +93,7 @@ export function validateInput(raw: unknown): TranscriptionInput {
     english: r.english,
   };
 }
-function wavBytes(audio: string) {
+export function wavBytes(audio: string) {
   const decoded = atob(audio);
   const bytes = Uint8Array.from(decoded, (c) => c.charCodeAt(0));
   const v = new DataView(bytes.buffer);
@@ -284,14 +284,11 @@ export async function transcribe(
     cost: number | null = null;
   if (connection === 'openrouter') {
     const options: Json = {};
-    if (terms.length && input.id === 'gpt') {
-      options.openai = { keywords: terms };
-      hints = 'Keywords sent via OpenRouter; forwarding unverified.';
-    }
-    if (terms.length && input.id === 'voxtral') {
-      options.mistral = { context_bias: terms };
-      options['mistral/eu'] = { context_bias: terms };
-      hints = 'Context hints sent via OpenRouter; forwarding unverified.';
+    if (terms.length && ['gpt', 'voxtral'].includes(input.id))
+      hints = 'Not sent: no custom vocabulary support via OpenRouter.';
+    if (terms.length && input.id === 'mai') {
+      options.azure = { phraseList: { phrases: terms } };
+      hints = 'Phrase list sent via OpenRouter; recognition is not guaranteed.';
     }
     settings = {
       ...settings,
@@ -316,6 +313,28 @@ export async function transcribe(
       data.usage.cost >= 0
     )
       cost = data.usage.cost;
+  } else if (connection === 'openai') {
+    const form = new FormData();
+    form.append('file', blob, 'take.wav');
+    form.append('model', model);
+    form.append('response_format', 'json');
+    if (english) form.append('languages[]', 'en');
+    for (const term of terms) form.append('keywords[]', term);
+    const data = await request(
+      'https://api.openai.com/v1/audio/transcriptions',
+      {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${key}` },
+        body: form,
+      },
+    );
+    transcript = text(data.text);
+    settings = {
+      languages: english ? ['en'] : [],
+      keywords: terms,
+      response_format: 'json',
+    };
+    if (terms.length) hints = 'Keywords sent directly to OpenAI.';
   } else if (connection === 'meta') {
     const params: Json = {
       model,

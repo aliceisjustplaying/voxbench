@@ -1,5 +1,6 @@
 export type Connection =
   | 'openrouter'
+  | 'openai'
   | 'meta'
   | 'gemini'
   | 'elevenlabs'
@@ -41,7 +42,9 @@ export const models: Model[] = [
     maker: 'OpenAI',
     connection: 'openrouter',
     model: 'openai/gpt-transcribe',
-    vocabulary: 'Hints via OpenRouter; forwarding unverified',
+    direct: 'openai',
+    directModel: 'gpt-transcribe',
+    vocabulary: 'Custom vocabulary requires your OpenAI key',
     docs: 'https://openrouter.ai/openai/gpt-transcribe',
   },
   {
@@ -59,7 +62,7 @@ export const models: Model[] = [
     maker: 'Mistral',
     connection: 'openrouter',
     model: 'mistralai/voxtral-mini-transcribe',
-    vocabulary: 'Hints via OpenRouter; forwarding unverified',
+    vocabulary: 'No custom vocabulary support via OpenRouter',
     docs: 'https://docs.mistral.ai/models/voxtral-mini-transcribe-26-02',
   },
   {
@@ -88,7 +91,7 @@ export const models: Model[] = [
     maker: 'Microsoft',
     connection: 'openrouter',
     model: 'microsoft/mai-transcribe-2',
-    vocabulary: 'No hints sent in this spike',
+    vocabulary: 'Phrase-list hints via OpenRouter',
     docs: 'https://openrouter.ai/microsoft/mai-transcribe-2',
   },
   {
@@ -130,6 +133,12 @@ export const connections: {
     name: 'OpenRouter',
     url: 'https://openrouter.ai/keys',
     note: 'One balance for OpenAI, Mistral, Deepgram, Microsoft, NVIDIA and Qwen.',
+  },
+  {
+    id: 'openai',
+    name: 'OpenAI · optional direct key',
+    url: 'https://platform.openai.com/api-keys',
+    note: 'Takes priority for GPT Transcribe and enables custom vocabulary. Uses your OpenAI balance.',
   },
   {
     id: 'meta',
