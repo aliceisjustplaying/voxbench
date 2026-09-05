@@ -660,7 +660,7 @@ export default function Home() {
       />
       <header>
         <a className="brand" href="/">
-          <AudioLines /> Voxbench<span>SPEECH RECOGNITION, COMPARED</span>
+          <AudioLines /> Voxbench
         </a>
         <Button
           variant="outline"
@@ -674,9 +674,6 @@ export default function Home() {
       <section className="intro">
         <div>
           <h1>Find the model that gets you.</h1>
-          <p>
-            One recording. Choose from eleven models. Compare what they hear.
-          </p>
         </div>
         <span className="bench-tag">
           11 contenders
@@ -708,7 +705,6 @@ export default function Home() {
                   {mode === 'free' ? '✓ Selected' : 'Choose free trial'}
                 </span>
               </span>
-              <span>Voxbench pays</span>
               <small>
                 {demo.remaining ?? 0} comparisons left · 30-second recordings
                 <br />
@@ -749,23 +745,22 @@ export default function Home() {
       </section>
       <section className="workspace">
         <div className="capture">
-          <div className="section-label">01 — THE RECORDING</div>
-          <h2>
-            {recording
-              ? 'Make it sound like you.'
-              : clip
-                ? 'One take. Ready to compare.'
-                : 'Start with your voice'}
-          </h2>
-          <div className={'record-circle ' + (recording ? 'recording' : '')}>
+          <button
+            type="button"
+            className={'record-circle ' + (recording ? 'recording' : '')}
+            onClick={recording ? stopRecording : startRecording}
+            disabled={preparing || busy}
+            aria-label={recording ? 'Stop recording' : clip ? 'Record another take' : 'Record a take'}
+            title={recording ? 'Stop recording' : clip ? 'Record another take' : 'Record a take'}
+          >
             {preparing ? (
               <Loader2 className="spin" size={30} />
             ) : recording ? (
-              <AudioLines size={34} />
+              <Square size={30} />
             ) : (
               <Mic size={30} />
             )}
-          </div>
+          </button>
           <div className="clock">
             {recording
               ? `${Math.floor(elapsed / 60)}:${String(Math.floor(elapsed % 60)).padStart(2, '0')}`
@@ -776,17 +771,6 @@ export default function Home() {
                   : 'Up to 60 seconds'}
           </div>
           <div className="record-actions">
-            <Button
-              onClick={recording ? stopRecording : startRecording}
-              disabled={preparing || busy}
-            >
-              {recording ? <Square /> : <Mic />}
-              {recording
-                ? 'Stop recording'
-                : clip
-                  ? 'Record another'
-                  : 'Record a take'}
-            </Button>
             {mode === 'own' && (
               <>
                 <Button
@@ -917,9 +901,7 @@ export default function Home() {
           </details>
         </div>
         <div className="lineup">
-          <div className="section-label">02 — THE LINEUP</div>
           <div className="lineup-title">
-            <h2>Who’s listening?</h2>
             <button
               className="text-button"
               disabled={busy || mode === 'free'}
@@ -1083,12 +1065,7 @@ export default function Home() {
       <section className="results">
         <div className="results-heading">
           <div>
-            <div className="section-label">03 — TRANSCRIPTS</div>
-            <h2>
-              {active
-                ? 'Same take. Different ears.'
-                : 'Your transcripts will appear here.'}
-            </h2>
+            <h2 className="section-label">TRANSCRIPTS</h2>
           </div>
           {active ? (
             <div className="view-actions">

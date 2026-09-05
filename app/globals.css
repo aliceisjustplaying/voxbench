@@ -1280,3 +1280,19 @@ summary:focus-visible {
   color: var(--primary);
   text-decoration: underline;
 }
+
+.record-circle {
+  border: 0;
+  cursor: pointer;
+}
+.record-circle:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+.record-circle:focus-visible {
+  outline: 3px solid var(--primary);
+  outline-offset: 15px;
+}
+.lineup-title {
+  justify-content: flex-end;
+}
