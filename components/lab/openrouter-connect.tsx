@@ -36,7 +36,7 @@ export function OpenRouterConnect() {
   return (
     <div className="openrouter-connect">
       <Button disabled={connecting} onClick={connect}>
-        Connect OpenRouter
+        Log in with OpenRouter
       </Button>
       {error && <p role="alert">{error}</p>}
     </div>
