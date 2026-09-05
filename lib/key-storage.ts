@@ -36,3 +36,25 @@ export function saveKeys(
   if (storage.getItem(KEY_STORAGE) !== json)
     throw new Error('Storage verification failed.');
 }
+
+export function mergeSavedKeys(
+  storage: Pick<Storage, 'getItem' | 'setItem'>,
+  patch: Keys,
+  replace = false,
+): Keys {
+  const existing = replace
+    ? {}
+    : parseKeys(storage.getItem(KEY_STORAGE) ?? '{}');
+  const next = { ...existing, ...patch };
+  saveKeys(storage, next);
+  return next;
+}
+export const VOCABULARY_STORAGE = 'voice-lab-vocabulary-v1';
+export function saveVocabulary(
+  storage: Pick<Storage, 'getItem' | 'setItem'>,
+  value: string,
+) {
+  storage.setItem(VOCABULARY_STORAGE, value);
+  if (storage.getItem(VOCABULARY_STORAGE) !== value)
+    throw new Error('Storage verification failed.');
+}

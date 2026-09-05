@@ -24,7 +24,7 @@ export function Connections({
   open: boolean;
   onOpenChange: (v: boolean) => void;
   keys: Keys;
-  onChange: (keys: Keys) => void;
+  onChange: (keys: Keys, replace?: boolean) => void;
 }) {
   const [transfer, setTransfer] = useState<'import' | 'export' | null>(null);
   const [json, setJson] = useState('');
@@ -115,7 +115,7 @@ export function Connections({
                       const imported = parseKeys(json);
                       if (!Object.keys(imported).length)
                         throw new Error('No keys found in this backup.');
-                      onChange({ ...keys, ...imported });
+                      onChange(imported);
                       closeTransfer();
                     } catch (error) {
                       setMessage(
@@ -152,7 +152,7 @@ export function Connections({
                 autoComplete="off"
                 spellCheck={false}
                 value={keys[c.id] || ''}
-                onChange={(e) => onChange({ ...keys, [c.id]: e.target.value })}
+                onChange={(e) => onChange({ [c.id]: e.target.value })}
                 placeholder="Paste API key"
               />
               <p>{c.note}</p>
@@ -164,7 +164,7 @@ export function Connections({
             variant="outline"
             disabled={!loaded}
             onClick={() => {
-              onChange({});
+              onChange({}, true);
               closeTransfer();
             }}
           >

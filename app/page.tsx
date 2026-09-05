@@ -15,7 +15,13 @@ import {
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { KEY_STORAGE, parseKeys, saveKeys } from '@/lib/key-storage';
+import {
+  KEY_STORAGE,
+  parseKeys,
+  mergeSavedKeys,
+  VOCABULARY_STORAGE,
+  saveVocabulary,
+} from '@/lib/key-storage';
 import { Connections } from '@/components/lab/connections';
 import { ResultCard, type Result } from '@/components/lab/result-card';
 import { models, connectionFor, type Keys } from '@/lib/models';
@@ -54,10 +60,11 @@ export default function Home() {
     }
     setKeysLoaded(true);
   }, []);
-  function updateKeys(next: Keys) {
-    setKeys(next);
+  function updateKeys(patch: Keys, replace = false) {
+    setKeys(replace ? patch : { ...keys, ...patch });
     try {
-      saveKeys(localStorage, next);
+      const saved = mergeSavedKeys(localStorage, patch, replace);
+      setKeys(saved);
       setKeyStorageStatus('Saved in this browser.');
     } catch {
       setKeyStorageStatus(
@@ -75,10 +82,14 @@ export default function Home() {
     [english, setEnglish] = useState(true),
     [reference, setReference] = useState('');
   const [vocabularyStorageError, setVocabularyStorageError] = useState('');
+  const [vocabularySaved, setVocabularySaved] = useState(false);
   useEffect(() => {
     try {
-      const saved = localStorage.getItem('voice-lab-vocabulary-v1');
-      if (saved !== null) setVocabularyValue(saved);
+      const saved = localStorage.getItem(VOCABULARY_STORAGE);
+      if (saved !== null) {
+        setVocabularyValue(saved);
+        setVocabularySaved(true);
+      }
     } catch {
       setVocabularyStorageError(
         'Could not restore vocabulary from this browser.',
@@ -88,14 +99,42 @@ export default function Home() {
   function setVocabulary(value: string) {
     setVocabularyValue(value);
     try {
-      localStorage.setItem('voice-lab-vocabulary-v1', value);
+      saveVocabulary(localStorage, value);
+      setVocabularySaved(true);
       setVocabularyStorageError('');
     } catch {
+      setVocabularySaved(false);
       setVocabularyStorageError(
         'Could not save vocabulary. Copy it before refreshing.',
       );
     }
   }
+  useEffect(() => {
+    function syncStorage(event: StorageEvent) {
+      if (event.storageArea !== localStorage) return;
+      if (event.key === KEY_STORAGE || event.key === null) {
+        try {
+          setKeys(parseKeys(event.newValue ?? '{}'));
+          setKeyStorageStatus(
+            event.newValue
+              ? 'Updated from another tab.'
+              : 'Saved keys were removed in another tab.',
+          );
+        } catch {
+          setKeyStorageStatus(
+            'Another tab saved an unreadable key backup. Current keys are unchanged.',
+          );
+        }
+      }
+      if (event.key === VOCABULARY_STORAGE || event.key === null) {
+        setVocabularyValue(event.newValue ?? '');
+        setVocabularySaved(event.newValue !== null);
+        setVocabularyStorageError('');
+      }
+    }
+    window.addEventListener('storage', syncStorage);
+    return () => window.removeEventListener('storage', syncStorage);
+  }, []);
   const [runs, setRuns] = useState<Run[]>([]),
     [activeId, setActiveId] = useState(''),
     [busy, setBusy] = useState(false),
@@ -609,8 +648,10 @@ export default function Home() {
             )}
             <div className="dictionary-import">
               <small>
-                Saved in this browser. One term per line. Hint support varies by
-                connection.
+                {vocabularySaved
+                  ? 'Saved in this browser.'
+                  : 'Saves automatically as you type.'}{' '}
+                One term per line. Hint support varies by connection.
               </small>
               <button
                 disabled={busy}
@@ -856,8 +897,9 @@ export default function Home() {
       </section>
       <footer>
         <span>
-          This site does not save audio, keys or results. Export before closing.
-          Selected providers receive audio and apply their own data policies.
+          Keys and vocabulary are saved in this browser. Audio and results are
+          not saved; export them before closing. Selected providers receive
+          audio and apply their own data policies.
         </span>
         <details>
           <summary>Model sources · checked 5 Sep 2026</summary>
