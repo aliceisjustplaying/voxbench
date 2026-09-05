@@ -1,0 +1,47 @@
+<!doctype html>
+<!-- Source for public/og.png. Render with: npm run og -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root { --ink: #151c2c; --muted: #566178; --green: #1d6b45; --rule: #dce1eb; }
+  html, body { margin: 0; width: 1200px; height: 630px; overflow: hidden; }
+  body { background: #fff; color: var(--ink); font-family: Geist, system-ui, sans-serif; position: relative; }
+  .frame { position: absolute; inset: 0; padding: 56px 72px; display: flex; flex-direction: column; }
+  .top { display: flex; justify-content: space-between; align-items: center; }
+  .brand { display: flex; align-items: center; gap: 12px; font-size: 26px; font-weight: 600; letter-spacing: -0.4px; }
+  .brand svg { color: var(--green); }
+  .url { font-size: 20px; color: var(--muted); }
+  h1 { font-size: 72px; line-height: 1.04; letter-spacing: -2.4px; font-weight: 600; margin: 74px 0 0; max-width: 18ch; }
+  .models { margin-top: 44px; font-size: 22px; line-height: 1.55; color: var(--muted); max-width: 980px; }
+  .models b { color: var(--ink); font-weight: 500; }
+  .bottom { margin-top: auto; display: flex; align-items: center; gap: 22px; padding-top: 28px; border-top: 1px solid var(--rule); }
+  .wave { display: flex; align-items: center; gap: 4px; height: 28px; }
+  .wave i { display: block; width: 4px; border-radius: 2px; background: var(--green); }
+  .tag { font-size: 24px; font-weight: 500; }
+  .tag span { color: var(--muted); font-weight: 400; }
+</style>
+</head>
+<body>
+<div class="frame">
+  <div class="top">
+    <div class="brand">
+      <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 10v3"/><path d="M6 6v11"/><path d="M10 3v18"/><path d="M14 8v7"/><path d="M18 5v13"/><path d="M22 10v3"/></svg>
+      Voxbench
+    </div>
+    <div class="url">voxbench.app</div>
+  </div>
+  <h1>Which speech-to-text model hears you best?</h1>
+  <p class="models">
+    <b>Muse</b> · <b>Gemini 3.5</b> · <b>GPT Transcribe</b> · <b>Scribe v2</b> · <b>Voxtral</b> · <b>Universal-3.5</b> · <b>Nova-3</b> · <b>MAI-Transcribe</b> · <b>Nemotron</b> · <b>Qwen3</b> · <b>Parakeet</b>
+  </p>
+  <div class="bottom">
+    <div class="wave">
+      <i style="height:8px"></i><i style="height:18px"></i><i style="height:28px"></i><i style="height:14px"></i><i style="height:22px"></i><i style="height:10px"></i><i style="height:26px"></i><i style="height:16px"></i><i style="height:6px"></i>
+    </div>
+    <div class="tag">Three models free. <span>All eleven with your own keys.</span></div>
+  </div>
+</div>
+</body>
+</html>

@@ -672,10 +672,10 @@ export default function Home() {
       </header>
       <section className="intro">
         <div>
-          <h1>Eleven speech-to-text models, one recording of your voice.</h1>
+          <h1>Which speech-to-text model hears you best?</h1>
           <p>
-            Record a take, pick models, and read every transcript side by side.
-            Add what you said to score word errors.
+            Record a take and read 11 transcripts side by side. Three models
+            free, all eleven with your own keys.
           </p>
         </div>
       </section>

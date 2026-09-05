@@ -14,10 +14,32 @@ const geistMono = Geist_Mono({
   preload: false,
 });
 
+const description =
+  'Record a take and read 11 speech-to-text transcripts side by side. Three models free, all eleven with your own keys.';
 export const metadata: Metadata = {
-  title: 'Voxbench — compare your transcripts',
-  description:
-    'Compare speech recognition models on identical recordings of your voice.',
+  metadataBase: new URL('https://voxbench.app'),
+  title: 'Voxbench — which speech-to-text model hears you best?',
+  description,
+  openGraph: {
+    type: 'website',
+    url: '/',
+    siteName: 'Voxbench',
+    title: 'Which speech-to-text model hears you best?',
+    description,
+    images: [
+      {
+        url: '/og.png',
+        width: 1200,
+        height: 630,
+        alt: 'Voxbench: which speech-to-text model hears you best? Eleven models, three free.',
+      },
+    ],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    site: '@aliceisplaying',
+    creator: '@aliceisplaying',
+  },
 };
 
 export default function RootLayout({

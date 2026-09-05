@@ -14,7 +14,8 @@
     "test": "node --test tests/*.test.ts",
     "typecheck": "tsc --noEmit",
     "deploy": "npm run build && wrangler deploy --config wrangler.standalone.json",
-    "benchmark": "node scripts/benchmark-audio.ts"
+    "benchmark": "node scripts/benchmark-audio.ts",
+    "og": "\"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome\" --headless=new --disable-gpu --hide-scrollbars --window-size=1200,630 --force-device-scale-factor=1 --virtual-time-budget=6000 --screenshot=public/og.png \"file://$PWD/scripts/og.html\""
   },
   "dependencies": {
     "react": "19.2.8",
