@@ -1,12 +1,6 @@
 'use client';
 import { useMemo, useState } from 'react';
-import {
-  Check,
-  Copy,
-  Loader2,
-  MessageSquareQuote,
-  RotateCcw,
-} from 'lucide-react';
+import { Check, Copy, Loader2, Star, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { models } from '@/lib/models';
 import { compareWords, vocabularyHits } from '@/lib/comparison';
@@ -69,7 +63,10 @@ export function ResultCard({
     }
   }
   return (
-    <article className={'result-card ' + (isReference ? 'is-reference' : '')}>
+    <article
+      className={'result-card ' + (isReference ? 'is-reference' : '')}
+      style={{ viewTransitionName: 'result-' + result.id }}
+    >
       <div className="result-top">
         <div>
           <span className="eyebrow">
@@ -125,8 +122,8 @@ export function ResultCard({
               aria-pressed={isReference}
               onClick={onUseAsReference}
             >
-              <MessageSquareQuote />
-              {isReference ? 'Your reference' : 'This is what I said'}
+              <Star fill={isReference ? 'currentColor' : 'none'} />
+              {isReference ? 'Marked closest' : 'Closest match'}
             </Button>
           </div>
           {copyError ? (

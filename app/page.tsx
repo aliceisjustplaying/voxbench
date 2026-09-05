@@ -3,6 +3,7 @@
 import Script from 'next/script';
 import { readApiResponse } from '@/lib/api-response';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import {
   Mic,
   AudioLines,
@@ -199,6 +200,7 @@ export default function Home() {
     [activeId, setActiveId] = useState(''),
     [busy, setBusy] = useState(false),
     [view, setView] = useState('raw'),
+    [sortByRank, setSortByRank] = useState(false),
     [error, setError] = useState('');
   const recorder = useRef<MediaRecorder | null>(null),
     stream = useRef<MediaStream | null>(null),
@@ -227,6 +229,14 @@ export default function Home() {
             ),
     [active],
   );
+  function withTransition(update: () => void) {
+    const doc = document as Document & {
+      startViewTransition?: (cb: () => void) => unknown;
+    };
+    if (doc.startViewTransition)
+      doc.startViewTransition(() => flushSync(update));
+    else update();
+  }
   function setRunReference(text: string) {
     if (active)
       setRuns((old) =>
@@ -1137,6 +1147,15 @@ export default function Home() {
                   <TabsTrigger value="lowercase">Lowercase</TabsTrigger>
                 </TabsList>
               </Tabs>
+              <Button
+                variant="outline"
+                size="sm"
+                aria-pressed={sortByRank}
+                disabled={!ranking?.basis}
+                onClick={() => withTransition(() => setSortByRank((v) => !v))}
+              >
+                {sortByRank ? 'Original order' : 'Sort by rank'}
+              </Button>
               <Button variant="outline" size="sm" onClick={exportRun}>
                 <Download />
                 Export JSON
@@ -1172,7 +1191,7 @@ export default function Home() {
             rows={3}
             value={active ? active.reference : reference}
             onChange={(e) => setRunReference(e.target.value)}
-            placeholder="Click “This is what I said” on the closest transcript, then fix any wrong words here. Stays in your browser."
+            placeholder="Mark the closest match below, then fix any wrong words here. Stays in your browser."
           />
           <p>
             Word errors count substituted, missing, and extra words, ignoring
@@ -1204,31 +1223,32 @@ export default function Home() {
               <p className="ranking-note">
                 {ranking.basis === 'reference'
                   ? 'Ranked by word errors against your reference.'
-                  : 'Ranked by agreement between models. Click “This is what I said” on the correct transcript to rank by accuracy instead.'}
+                  : 'Ranked by agreement between models. Mark the closest match to rank against it instead.'}
               </p>
             )}
             <div className="result-grid">
-              {(ranking?.order ?? [])
-                .map((id) => active.results.find((r) => r.id === id)!)
-                .map((r) => (
-                  <ResultCard
-                    key={active.id + r.id}
-                    result={r}
-                    rank={ranking?.rank[r.id]}
-                    isReference={
-                      !!r.output && r.output.text === active.reference
-                    }
-                    reference={active.reference}
-                    terms={active.terms}
-                    lowercase={view === 'lowercase'}
-                    busy={busy}
-                    onRetry={() => retry(active, r.id)}
-                    onChange={(patch) => updateResult(active.id, r.id, patch)}
-                    onUseAsReference={() =>
-                      setRunReference(r.output?.text ?? '')
-                    }
-                  />
-                ))}
+              {(sortByRank && ranking?.basis
+                ? ranking.order.map((id) =>
+                    active.results.find((r) => r.id === id)!,
+                  )
+                : active.results
+              ).map((r) => (
+                <ResultCard
+                  key={active.id + r.id}
+                  result={r}
+                  rank={ranking?.rank[r.id]}
+                  isReference={!!r.output && r.output.text === active.reference}
+                  reference={active.reference}
+                  terms={active.terms}
+                  lowercase={view === 'lowercase'}
+                  busy={busy}
+                  onRetry={() => retry(active, r.id)}
+                  onChange={(patch) => updateResult(active.id, r.id, patch)}
+                  onUseAsReference={() =>
+                    withTransition(() => setRunReference(r.output?.text ?? ''))
+                  }
+                />
+              ))}
             </div>
             <p className="timing-note">
               Time covers upload and processing of the whole file. Up to three
