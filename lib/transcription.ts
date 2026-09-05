@@ -236,6 +236,8 @@ export async function transcribe(
       ...init,
       signal,
       redirect: 'manual',
+      // Browsers may heuristically cache GET polls; always hit the provider.
+      cache: 'no-store',
     });
     if (!response.ok) {
       const raw = await response.text();
