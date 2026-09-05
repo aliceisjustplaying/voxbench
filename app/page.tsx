@@ -931,7 +931,14 @@ export default function Home() {
                         {m.maker} ·{' '}
                         {c === 'openrouter' ? 'OpenRouter' : 'Direct'}
                       </span>
-                      <small>
+                      <small
+                        className={
+                          c === 'openrouter' &&
+                          (m.id === 'gpt' || m.id === 'voxtral')
+                            ? 'vocabulary-warning'
+                            : undefined
+                        }
+                      >
                         {m.id === 'gpt'
                           ? c === 'openai'
                             ? 'Custom vocabulary · your OpenAI key'

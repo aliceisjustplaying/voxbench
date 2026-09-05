@@ -826,9 +826,6 @@ summary:focus-visible {
   .model-grid {
     grid-template-columns: 1fr;
   }
-  .model-choice small {
-    display: none;
-  }
   .result-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -1251,4 +1248,14 @@ summary:focus-visible {
   .openrouter-connect button {
     width: 100%;
   }
+}
+
+.model-choice .vocabulary-warning {
+  display: block;
+  color: #854600;
+  background: #fff3d6;
+  border-radius: 5px;
+  padding: 6px 8px;
+  font-size: 13px;
+  font-weight: 600;
 }
