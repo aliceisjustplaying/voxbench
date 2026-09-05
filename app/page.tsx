@@ -565,7 +565,7 @@ export default function Home() {
             </div>
             <textarea
               aria-label="Personal vocabulary"
-              placeholder={'Sarah\nKubernetes\nMonologue'}
+              placeholder={'Alice\nSourdough\nMonologue'}
               rows={3}
               value={vocabulary}
               onChange={(e) => setVocabulary(e.target.value)}
