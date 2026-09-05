@@ -675,17 +675,11 @@ export default function Home() {
         <div>
           <h1>Find the model that gets you.</h1>
         </div>
-        <span className="bench-tag">
-          11 contenders
-          <br />
-          <strong>Your accent is the test.</strong>
-        </span>
       </section>
       <section
         className="access-bar"
         aria-label="Choose how to pay for comparisons"
       >
-        <div className="section-label">HOW DO YOU WANT TO COMPARE?</div>
         <div className="access-choices">
           {demo.available && (
             <button
@@ -1173,8 +1167,6 @@ export default function Home() {
             <AudioLines size={30} />
             <p>
               Record a take, choose your models, then compare.
-              <br />
-              Real results only — no sample transcripts.
             </p>
           </div>
         )}
