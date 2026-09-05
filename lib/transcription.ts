@@ -151,7 +151,18 @@ export async function transcribe(
     : 'Off';
   let settings: Json = { language: english ? 'en' : 'auto' };
   const request = async (url: string, init: RequestInit): Promise<Json> => {
-    const response = await fetcher(url, { ...init, signal, redirect: 'error' });
+    // Workers supports manual/follow, but rejects the browser's "error" mode.
+    // Reject redirects ourselves so credentials never follow another URL.
+    const response = await fetcher(url, {
+      ...init,
+      signal,
+      redirect: 'manual',
+    });
+    if (response.status >= 300 && response.status < 400)
+      throw new RequestError(
+        'Provider redirected the request. No credentials were forwarded to the redirect destination.',
+        502,
+      );
     let data: Json;
     try {
       data = (await response.json()) as Json;

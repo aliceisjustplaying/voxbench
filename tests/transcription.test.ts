@@ -233,3 +233,20 @@ test('malformed WAV is rejected before provider access', async () => {
   );
   assert.equal(calls, 0);
 });
+
+test('uses Worker-compatible redirect mode and never follows provider redirects', async () => {
+  let calls = 0;
+  await assert.rejects(
+    () =>
+      transcribe(base, new AbortController().signal, async (_url, init) => {
+        calls++;
+        assert.equal(init?.redirect, 'manual');
+        return new Response(null, {
+          status: 307,
+          headers: { Location: 'https://example.com' },
+        });
+      }),
+    /Provider redirected/,
+  );
+  assert.equal(calls, 1);
+});

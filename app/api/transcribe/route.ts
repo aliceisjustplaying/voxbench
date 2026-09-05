@@ -7,6 +7,7 @@ export async function POST(request: Request) {
       { status: 403 },
     );
   const headers = { 'Cache-Control': 'no-store' };
+  let apiKey = '';
   try {
     if (!request.headers.get('content-type')?.includes('application/json'))
       throw new RequestError('Expected a comparison request.');
@@ -41,6 +42,7 @@ export async function POST(request: Request) {
       throw new RequestError('Invalid comparison request.');
     }
     const input = validateInput(raw);
+    apiKey = input.key;
     const signal = AbortSignal.any([
       request.signal,
       AbortSignal.timeout(150_000),
@@ -52,6 +54,12 @@ export async function POST(request: Request) {
         { error: error.message },
         { status: error.status, headers },
       );
+    console.error('Transcription request failed', {
+      name: error instanceof Error ? error.name : 'UnknownError',
+      message: error instanceof Error
+        ? (apiKey ? error.message.replaceAll(apiKey, '[redacted]') : error.message).slice(0, 300)
+        : 'Unknown failure',
+    });
     const timedOut =
       error instanceof Error &&
       ['AbortError', 'TimeoutError'].includes(error.name);
