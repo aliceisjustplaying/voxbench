@@ -682,8 +682,8 @@ export default function Home() {
         className="access-bar"
         aria-label="Choose how to pay for comparisons"
       >
-        <div className="access-choices">
-          {demo.available && (
+        {demo.available && (
+          <div className="access-choices">
             <button
               type="button"
               className="access-choice"
@@ -697,45 +697,36 @@ export default function Home() {
             >
               <span className="access-choice-heading">
                 <strong>Free trial</strong>
-                <span className="access-choice-state">
-                  {mode === 'free' ? 'Selected' : 'Select'}
-                </span>
               </span>
               <small>
-                {demo.remaining ?? 0} left · up to 30 seconds
-                <br />
-                GPT, Voxtral and MAI
+                {demo.remaining ?? 0} left · up to 30 seconds · GPT, Voxtral and
+                MAI
               </small>
             </button>
-          )}
-          <button
-            type="button"
-            className="access-choice"
-            aria-pressed={mode === 'own'}
-            disabled={busy || recording}
-            onClick={() => {
-              setMode('own');
-              setDemoToken('');
-            }}
-          >
-            <span className="access-choice-heading">
-              <strong>My API keys</strong>
-              <span className="access-choice-state">
-                {mode === 'own' ? 'Selected' : 'Select'}
+            <button
+              type="button"
+              className="access-choice"
+              aria-pressed={mode === 'own'}
+              disabled={busy || recording}
+              onClick={() => {
+                setMode('own');
+                setDemoToken('');
+              }}
+            >
+              <span className="access-choice-heading">
+                <strong>My API keys</strong>
               </span>
-            </span>
-            <small>
-              All 11 models · up to 60 seconds
-              <br />
-              Vocabulary hints depend on the model and route
-            </small>
-          </button>
-        </div>
-        <p className="access-current" role="status">
-          {mode === 'free'
-            ? 'Free trial selected — Voxbench pays.'
-            : 'Your keys selected — providers bill you.'}
-        </p>
+              <small>All 11 models · up to 60 seconds</small>
+            </button>
+          </div>
+        )}
+        {demo.available && (
+          <p className="access-current" role="status">
+            {mode === 'free'
+              ? 'Free trial selected — Voxbench pays.'
+              : 'Your keys selected — providers bill you.'}
+          </p>
+        )}
         {mode === 'own' && <OpenRouterConnect />}
       </section>
       <section className="workspace">
@@ -1177,7 +1168,6 @@ export default function Home() {
           </>
         ) : (
           <div className="empty-results">
-            <AudioLines size={30} />
             <p>Transcripts appear here after you compare.</p>
           </div>
         )}
