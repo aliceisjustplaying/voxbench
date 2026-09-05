@@ -6,7 +6,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Mic,
   AudioLines,
-  ArrowUpRight,
   Upload,
   Square,
   KeyRound,
@@ -51,6 +50,10 @@ const FREE_MODELS = ['gpt', 'voxtral', 'mai'];
 type DemoStatus = { available: boolean; remaining?: number; siteKey?: string };
 export default function Home() {
   const [mode, setMode] = useState<'free' | 'own'>('own');
+  const [demoChecked, setDemoChecked] = useState(false);
+  const [inputs, setInputs] = useState<MediaDeviceInfo[]>([]);
+  const [inputId, setInputId] = useState('');
+  const [inputLabel, setInputLabel] = useState('');
   const [demo, setDemo] = useState<DemoStatus>({ available: false });
   const [demoToken, setDemoToken] = useState('');
   const [demoReset, setDemoReset] = useState(0);
@@ -71,7 +74,23 @@ export default function Home() {
           /* Keep manual setup on storage errors. */
         }
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setDemoChecked(true));
+  }, []);
+  async function refreshInputs() {
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      setInputs(devices.filter((d) => d.kind === 'audioinput' && d.label));
+    } catch {
+      /* Device list is optional. */
+    }
+  }
+  useEffect(() => {
+    const media = navigator.mediaDevices;
+    if (!media?.addEventListener) return;
+    const onChange = () => void refreshInputs();
+    media.addEventListener('devicechange', onChange);
+    return () => media.removeEventListener('devicechange', onChange);
   }, []);
   const [keys, setKeys] = useState<Keys>({}),
     [keysOpen, setKeysOpen] = useState(false);
@@ -286,7 +305,10 @@ export default function Home() {
       )
         throw new Error('This browser can’t record. Upload an audio file.');
       const s = await navigator.mediaDevices.getUserMedia({
-        audio: { channelCount: 1 },
+        audio: {
+          channelCount: 1,
+          ...(inputId ? { deviceId: { exact: inputId } } : {}),
+        },
         video: false,
       });
       stream.current = s;
@@ -294,6 +316,11 @@ export default function Home() {
         s.getTracks().forEach((t) => t.stop());
         return;
       }
+      const track = s.getAudioTracks()[0];
+      setInputLabel(track?.label || '');
+      if (!inputId && track?.getSettings().deviceId)
+        setInputId(track.getSettings().deviceId!);
+      void refreshInputs();
       const mime = ['audio/webm;codecs=opus', 'audio/mp4', 'audio/webm'].find(
         (m) => MediaRecorder.isTypeSupported(m),
       );
@@ -667,7 +694,7 @@ export default function Home() {
           disabled={busy}
         >
           <KeyRound />
-          {keyCount ? `API keys · ${keyCount}` : 'Add API keys'}
+          {keyCount ? `API keys · ${keyCount}` : 'API keys'}
         </Button>
       </header>
       <section className="intro">
@@ -679,368 +706,392 @@ export default function Home() {
           </p>
         </div>
       </section>
-      <section
-        className="access-bar"
-        aria-label="Choose how to pay for comparisons"
-      >
-        {demo.available && (
-          <div className="access-choices">
-            <button
-              type="button"
-              className="access-choice"
-              aria-pressed={mode === 'free'}
-              disabled={busy || recording}
-              onClick={() => {
-                setMode('free');
-                setDemoToken('');
-                setDemoReset((n) => n + 1);
-              }}
-            >
-              Free trial · {demo.remaining ?? 0} left
-            </button>
-            <button
-              type="button"
-              className="access-choice"
-              aria-pressed={mode === 'own'}
-              disabled={busy || recording}
-              onClick={() => {
-                setMode('own');
-                setDemoToken('');
-              }}
-            >
-              My API keys
-            </button>
-          </div>
-        )}
-        {mode === 'own' && !keys.openrouter?.trim() && <OpenRouterConnect />}
-      </section>
-      <section className="workspace">
-        <div className="capture">
-          <button
-            type="button"
-            className={'record-circle ' + (recording ? 'recording' : '')}
-            onClick={recording ? stopRecording : startRecording}
-            disabled={preparing || busy}
-            aria-label={
-              recording
-                ? 'Stop recording'
-                : clip
-                  ? 'Record another take'
-                  : 'Record a take'
-            }
-            title={
-              recording
-                ? 'Stop recording'
-                : clip
-                  ? 'Record another take'
-                  : 'Record a take'
-            }
-          >
-            {preparing ? (
-              <Loader2 className="spin" size={30} />
-            ) : recording ? (
-              <Square size={30} />
-            ) : (
-              <Mic size={30} />
-            )}
-          </button>
-          <div className="clock">
-            {recording
-              ? `${Math.floor(elapsed / 60)}:${String(Math.floor(elapsed % 60)).padStart(2, '0')}`
-              : clip
-                ? `${clip.duration.toFixed(1)} seconds`
-                : mode === 'free'
-                  ? 'Up to 30 seconds'
-                  : 'Up to 60 seconds'}
-          </div>
-          <div className="record-actions">
-            {mode === 'own' && (
-              <>
-                <Button
-                  variant="outline"
-                  onClick={() => upload.current?.click()}
-                  disabled={preparing || recording || busy}
-                >
-                  <Upload />
-                  Upload
-                </Button>
-                <input
-                  ref={upload}
-                  type="file"
-                  accept="audio/*,.wav,.mp3,.m4a,.webm,.ogg,.flac"
-                  className="sr-only"
-                  aria-label="Upload an audio recording"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file && mode === 'own') void loadClip(file, file.name);
-                    e.target.value = '';
-                  }}
-                />
-              </>
-            )}
-          </div>
-          {clip && !recording ? (
-            <div className="audio-preview">
-              {/* oxlint-disable-next-line jsx-a11y/media-has-caption -- This is the user’s audio input; transcripts are generated below. */}
-              <audio
-                key={clip.url}
-                controls
-                src={clip.url}
-                aria-label="Your recording"
-              />
-              <div>
-                <span>{clip.name}</span>
-                <button
-                  onClick={() => downloadBlob(clip.blob, 'voxbench-take.wav')}
-                  title="Download the exact audio used"
-                >
-                  Save WAV <Download size={13} />
-                </button>
-              </div>
-              <small>
-                Every model gets the same 16 kHz mono WAV.
-                <br />
-                Audio ID {clip.hash.slice(0, 12)}
-              </small>
-            </div>
-          ) : (
-            <p className="record-tip">
-              Use the names and terms you actually say.
-            </p>
-          )}
-          <details className="vocab">
-            <summary>
-              Vocabulary &amp; language
-              <span>
-                {useVocabulary
-                  ? `${parseVocabulary(vocabulary).length} hints`
-                  : 'Hints off'}
-              </span>
-            </summary>
-            <div className="vocab-content">
-              <div className="vocab-heading">
-                <label className="check-label" htmlFor="use-vocabulary">
-                  <Checkbox
-                    id="use-vocabulary"
-                    checked={useVocabulary}
-                    onCheckedChange={(v) => setUseVocabulary(!!v)}
-                    disabled={busy}
-                  />
-                  Send vocabulary hints
-                </label>
-                <small>{parseVocabulary(vocabulary).length}/100</small>
-              </div>
-              <textarea
-                aria-label="Personal vocabulary"
-                placeholder={'Alice\nSourdough\nMonologue'}
-                rows={3}
-                value={vocabulary}
-                onChange={(e) => setVocabulary(e.target.value)}
-                disabled={busy}
-              />
-              {vocabularyStorageError && (
-                <p role="alert">{vocabularyStorageError}</p>
-              )}
-              <div className="dictionary-import">
-                <small>
-                  {vocabularySaved
-                    ? 'Saved in this browser.'
-                    : 'Saves automatically as you type.'}{' '}
-                  One term per line.
-                </small>
-                <button
-                  disabled={busy}
-                  onClick={() => dictionaryUpload.current?.click()}
-                >
-                  Import a dictionary
-                </button>
-                <input
-                  ref={dictionaryUpload}
-                  type="file"
-                  accept=".txt,.json"
-                  className="sr-only"
-                  aria-label="Import vocabulary from Monologue JSON or a text file"
-                  onChange={(e) => {
-                    const f = e.target.files?.[0];
-                    if (f) void loadDictionary(f);
-                    e.target.value = '';
-                  }}
-                />
-              </div>
-              <label
-                className="check-label language"
-                htmlFor="english-language"
+      <div hidden={!demoChecked}>
+        <section
+          className="access-bar"
+          aria-label="Choose how to pay for comparisons"
+        >
+          {demo.available && (
+            <div className="access-choices">
+              <button
+                type="button"
+                className="access-choice"
+                aria-pressed={mode === 'free'}
+                disabled={busy || recording}
+                onClick={() => {
+                  setMode('free');
+                  setDemoToken('');
+                  setDemoReset((n) => n + 1);
+                }}
               >
-                <Checkbox
-                  id="english-language"
-                  checked={english}
-                  onCheckedChange={(v) => setEnglish(!!v)}
-                  disabled={busy}
-                />
-                English <small>Uncheck to auto-detect language</small>
-              </label>
+                Free trial · {demo.remaining ?? 0} left
+              </button>
+              <button
+                type="button"
+                className="access-choice"
+                aria-pressed={mode === 'own'}
+                disabled={busy || recording}
+                onClick={() => {
+                  setMode('own');
+                  setDemoToken('');
+                }}
+              >
+                My API keys
+              </button>
             </div>
-          </details>
-        </div>
-        <div className="lineup">
-          <div className="lineup-title">
+          )}
+          {mode === 'own' && !keys.openrouter?.trim() && <OpenRouterConnect />}
+        </section>
+        <section className="workspace">
+          <div className="capture">
             <button
-              className="text-button"
-              disabled={busy || mode === 'free'}
-              onClick={() =>
-                setSelected(
-                  ready === available.length && ready > 0
-                    ? []
-                    : models.map((m) => m.id),
-                )
+              type="button"
+              className={'record-circle ' + (recording ? 'recording' : '')}
+              onClick={recording ? stopRecording : startRecording}
+              disabled={preparing || busy}
+              aria-label={
+                recording
+                  ? 'Stop recording'
+                  : clip
+                    ? 'Record another take'
+                    : 'Record a take'
+              }
+              title={
+                recording
+                  ? 'Stop recording'
+                  : clip
+                    ? 'Record another take'
+                    : 'Record a take'
               }
             >
-              {mode === 'free'
-                ? 'Free trial: 3 models'
-                : ready === available.length && ready > 0
-                  ? 'Deselect all'
-                  : 'Select all'}
+              {preparing ? (
+                <Loader2 className="spin" size={30} />
+              ) : recording ? (
+                <Square size={30} />
+              ) : (
+                <Mic size={30} />
+              )}
             </button>
-          </div>
-          <div className="model-grid">
-            {models
-              .filter((m) => mode === 'own' || FREE_MODELS.includes(m.id))
-              .map((m) => {
-                const c =
-                    mode === 'free' ? m.connection : connectionFor(m, keys),
-                  hasKey = !!keys[c]?.trim();
-                return (
-                  <label
-                    htmlFor={'model-' + m.id}
-                    className={
-                      'model-choice ' +
-                      (mode === 'free' || (hasKey && selected.includes(m.id))
-                        ? 'chosen'
-                        : '')
-                    }
-                    key={m.id}
-                  >
-                    {mode === 'own' && (
-                      <Checkbox
-                        id={'model-' + m.id}
-                        checked={hasKey && selected.includes(m.id)}
-                        onCheckedChange={(checked) =>
-                          setSelected((old) =>
-                            checked
-                              ? [...old, m.id]
-                              : old.filter((id) => id !== m.id),
-                          )
-                        }
-                        disabled={busy || !hasKey}
-                      />
-                    )}
-                    <span className="model-details">
-                      <strong>{m.name}</strong>
-                      <span className="model-meta">
-                        {m.maker} ·{' '}
-                        {c === 'openrouter' ? 'via OpenRouter' : 'direct'}
-                      </span>
-                      <small
-                        className={
-                          c === 'openrouter' &&
-                          (m.id === 'gpt' || m.id === 'voxtral')
-                            ? 'vocabulary-warning'
-                            : undefined
-                        }
-                      >
-                        {m.id === 'gpt'
-                          ? c === 'openai'
-                            ? 'Custom vocabulary via your OpenAI key'
-                            : 'Add an OpenAI key for vocabulary'
-                          : m.vocabulary}
-                      </small>
-                    </span>
-                    {mode === 'free' ? (
-                      <span className="key-status">Included</span>
-                    ) : hasKey ? (
-                      <span className="key-dot present" title="Key added" />
-                    ) : (
-                      <button
-                        type="button"
-                        className="key-status text-button"
-                        disabled={busy}
-                        onClick={() => setKeysOpen(true)}
-                      >
-                        Add key
-                      </button>
-                    )}
-                  </label>
-                );
-              })}
-          </div>
-          {mode === 'free' && demo.siteKey && !!demo.remaining && (
-            <DemoCheck
-              siteKey={demo.siteKey}
-              reset={demoReset}
-              onToken={setDemoToken}
-            />
-          )}
-          <div className="compare-bar">
-            <div>
-              <strong>
-                {mode === 'free' ? '3 models included' : `${ready} selected`}
-              </strong>
-              <span>
-                {mode === 'free'
-                  ? `${demo.remaining ?? 0} free comparisons left`
-                  : `${available.length} of ${models.length} available`}
-              </span>
+            <div className="clock">
+              {recording
+                ? `${Math.floor(elapsed / 60)}:${String(Math.floor(elapsed % 60)).padStart(2, '0')}`
+                : clip
+                  ? `${clip.duration.toFixed(1)} seconds`
+                  : mode === 'free'
+                    ? 'Up to 30 seconds'
+                    : 'Up to 60 seconds'}
             </div>
-            {busy ? (
-              <Button variant="outline" onClick={cancel}>
-                <X />
-                Stop
-              </Button>
+            {inputs.length > 1 ? (
+              <label className="input-device">
+                Microphone
+                <select
+                  value={inputId}
+                  disabled={recording || preparing || busy}
+                  onChange={(e) => setInputId(e.target.value)}
+                >
+                  {inputs.map((d) => (
+                    <option key={d.deviceId} value={d.deviceId}>
+                      {d.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : inputLabel ? (
+              <p className="input-device">Microphone: {inputLabel}</p>
+            ) : null}
+            <div className="record-actions">
+              {mode === 'own' && (
+                <>
+                  <Button
+                    variant="outline"
+                    onClick={() => upload.current?.click()}
+                    disabled={preparing || recording || busy}
+                  >
+                    <Upload />
+                    Upload
+                  </Button>
+                  <input
+                    ref={upload}
+                    type="file"
+                    accept="audio/*,.wav,.mp3,.m4a,.webm,.ogg,.flac"
+                    className="sr-only"
+                    aria-label="Upload an audio recording"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file && mode === 'own')
+                        void loadClip(file, file.name);
+                      e.target.value = '';
+                    }}
+                  />
+                </>
+              )}
+            </div>
+            {clip && !recording ? (
+              <div className="audio-preview">
+                {/* oxlint-disable-next-line jsx-a11y/media-has-caption -- This is the user’s audio input; transcripts are generated below. */}
+                <audio
+                  key={clip.url}
+                  controls
+                  src={clip.url}
+                  aria-label="Your recording"
+                />
+                <div>
+                  <span>{clip.name}</span>
+                  <button
+                    onClick={() => downloadBlob(clip.blob, 'voxbench-take.wav')}
+                    title="Download the exact audio used"
+                  >
+                    Save WAV <Download size={13} />
+                  </button>
+                </div>
+                <small>
+                  Every model gets the same 16 kHz mono WAV.
+                  <br />
+                  Audio ID {clip.hash.slice(0, 12)}
+                </small>
+              </div>
             ) : (
-              <Button
-                disabled={
-                  preparing ||
-                  recording ||
-                  (mode === 'free'
-                    ? !clip ||
-                      !demoToken ||
-                      !demo.remaining ||
-                      clip.duration > 30 ||
-                      clip.source !== 'recording'
-                    : ready > 0 && !clip)
+              <p className="record-tip">
+                Use the names and terms you actually say.
+              </p>
+            )}
+            <details className="vocab">
+              <summary>
+                Vocabulary &amp; language
+                <span>
+                  {useVocabulary
+                    ? `${parseVocabulary(vocabulary).length} hints`
+                    : 'Hints off'}
+                </span>
+              </summary>
+              <div className="vocab-content">
+                <div className="vocab-heading">
+                  <label className="check-label" htmlFor="use-vocabulary">
+                    <Checkbox
+                      id="use-vocabulary"
+                      checked={useVocabulary}
+                      onCheckedChange={(v) => setUseVocabulary(!!v)}
+                      disabled={busy}
+                    />
+                    Send vocabulary hints
+                  </label>
+                  <small>{parseVocabulary(vocabulary).length}/100</small>
+                </div>
+                <textarea
+                  aria-label="Personal vocabulary"
+                  placeholder={'Alice\nSourdough\nMonologue'}
+                  rows={3}
+                  value={vocabulary}
+                  onChange={(e) => setVocabulary(e.target.value)}
+                  disabled={busy}
+                />
+                {vocabularyStorageError && (
+                  <p role="alert">{vocabularyStorageError}</p>
+                )}
+                <div className="dictionary-import">
+                  <small>
+                    {vocabularySaved
+                      ? 'Saved in this browser.'
+                      : 'Saves automatically as you type.'}{' '}
+                    One term per line.
+                  </small>
+                  <button
+                    disabled={busy}
+                    onClick={() => dictionaryUpload.current?.click()}
+                  >
+                    Import a dictionary
+                  </button>
+                  <input
+                    ref={dictionaryUpload}
+                    type="file"
+                    accept=".txt,.json"
+                    className="sr-only"
+                    aria-label="Import vocabulary from Monologue JSON or a text file"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) void loadDictionary(f);
+                      e.target.value = '';
+                    }}
+                  />
+                </div>
+                <label
+                  className="check-label language"
+                  htmlFor="english-language"
+                >
+                  <Checkbox
+                    id="english-language"
+                    checked={english}
+                    onCheckedChange={(v) => setEnglish(!!v)}
+                    disabled={busy}
+                  />
+                  English <small>Uncheck to auto-detect language</small>
+                </label>
+              </div>
+            </details>
+          </div>
+          <div className="lineup">
+            <div className="lineup-title">
+              <button
+                className="text-button"
+                disabled={busy || mode === 'free'}
+                onClick={() =>
+                  setSelected(
+                    ready === available.length && ready > 0
+                      ? []
+                      : models.map((m) => m.id),
+                  )
                 }
-                onClick={compare}
               >
-                <Play />
                 {mode === 'free'
-                  ? 'Compare for free'
-                  : ready
-                    ? `Compare ${ready} ${ready === 1 ? 'model' : 'models'}`
-                    : 'Add keys to compare'}
-                <ArrowUpRight />
-              </Button>
+                  ? 'Free trial: 3 models'
+                  : ready === available.length && ready > 0
+                    ? 'Deselect all'
+                    : 'Select all'}
+              </button>
+            </div>
+            <div className="model-grid">
+              {models
+                .filter((m) => mode === 'own' || FREE_MODELS.includes(m.id))
+                .map((m) => {
+                  const c =
+                      mode === 'free' ? m.connection : connectionFor(m, keys),
+                    hasKey = !!keys[c]?.trim();
+                  return (
+                    <label
+                      htmlFor={'model-' + m.id}
+                      className={
+                        'model-choice ' +
+                        (mode === 'free' || (hasKey && selected.includes(m.id))
+                          ? 'chosen'
+                          : '')
+                      }
+                      key={m.id}
+                    >
+                      {mode === 'own' && (
+                        <Checkbox
+                          id={'model-' + m.id}
+                          checked={hasKey && selected.includes(m.id)}
+                          onCheckedChange={(checked) =>
+                            setSelected((old) =>
+                              checked
+                                ? [...old, m.id]
+                                : old.filter((id) => id !== m.id),
+                            )
+                          }
+                          disabled={busy || !hasKey}
+                        />
+                      )}
+                      <span className="model-details">
+                        <strong>{m.name}</strong>
+                        <span className="model-meta">
+                          {m.maker} ·{' '}
+                          {c === 'openrouter' ? 'via OpenRouter' : 'direct'}
+                        </span>
+                        <small
+                          className={
+                            mode === 'own' &&
+                            c === 'openrouter' &&
+                            (m.id === 'gpt' || m.id === 'voxtral')
+                              ? 'vocabulary-warning'
+                              : undefined
+                          }
+                        >
+                          {mode === 'free' &&
+                          (m.id === 'gpt' || m.id === 'voxtral')
+                            ? 'Vocabulary unsupported via OpenRouter'
+                            : m.id === 'gpt'
+                              ? c === 'openai'
+                                ? 'Custom vocabulary via your OpenAI key'
+                                : 'Add an OpenAI key for vocabulary'
+                              : m.vocabulary}
+                        </small>
+                      </span>
+                      {mode === 'free' ? (
+                        <span className="key-status">Included</span>
+                      ) : hasKey ? (
+                        <span className="key-dot present" title="Key added" />
+                      ) : (
+                        <button
+                          type="button"
+                          className="key-status text-button"
+                          disabled={busy}
+                          onClick={() => setKeysOpen(true)}
+                        >
+                          Add key
+                        </button>
+                      )}
+                    </label>
+                  );
+                })}
+            </div>
+            {mode === 'free' && demo.siteKey && !!demo.remaining && (
+              <DemoCheck
+                siteKey={demo.siteKey}
+                reset={demoReset}
+                onToken={setDemoToken}
+              />
+            )}
+            <div className="compare-bar">
+              <div>
+                <strong>
+                  {mode === 'free' ? '3 models included' : `${ready} selected`}
+                </strong>
+                <span>
+                  {mode === 'free'
+                    ? `${demo.remaining ?? 0} free comparisons left`
+                    : `${available.length} of ${models.length} available`}
+                </span>
+              </div>
+              {busy ? (
+                <Button variant="outline" onClick={cancel}>
+                  <X />
+                  Stop
+                </Button>
+              ) : (
+                <Button
+                  disabled={
+                    preparing ||
+                    recording ||
+                    (mode === 'free'
+                      ? !clip ||
+                        !demoToken ||
+                        !demo.remaining ||
+                        clip.duration > 30 ||
+                        clip.source !== 'recording'
+                      : ready > 0 && !clip)
+                  }
+                  onClick={compare}
+                >
+                  <Play />
+                  {mode === 'free'
+                    ? 'Compare for free'
+                    : ready
+                      ? `Compare ${ready} ${ready === 1 ? 'model' : 'models'}`
+                      : 'Add keys to compare'}
+                </Button>
+              )}
+            </div>
+            {mode === 'free' && clip && clip.source !== 'recording' && (
+              <p role="alert">
+                The free trial uses microphone recordings. Record a take, or
+                compare this file with your own keys.
+              </p>
+            )}
+            {mode === 'free' && clip && clip.duration > 30 && (
+              <p role="alert">
+                Free trial takes are up to 30 seconds. Record a shorter one, or
+                use your own keys.
+              </p>
+            )}
+            {mode === 'free' && (
+              <p className="billing-note">
+                Each attempt uses one free comparison, including failed ones.
+                Limits apply per browser and network.
+              </p>
             )}
           </div>
-          {mode === 'free' && clip && clip.source !== 'recording' && (
-            <p role="alert">
-              The free trial uses microphone recordings. Record a take, or
-              compare this file with your own keys.
-            </p>
-          )}
-          {mode === 'free' && clip && clip.duration > 30 && (
-            <p role="alert">
-              Free trial takes are up to 30 seconds. Record a shorter one, or
-              use your own keys.
-            </p>
-          )}
-          {mode === 'free' && (
-            <p className="billing-note">
-              Each attempt uses one free comparison, including failed ones.
-              Limits apply per browser and network.
-            </p>
-          )}
-        </div>
-      </section>
+        </section>
+      </div>
       {error ? (
         <p role="alert" className="error-banner">
           {error}
