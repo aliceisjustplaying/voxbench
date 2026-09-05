@@ -618,7 +618,7 @@ export default function Home() {
                     }
                     disabled={busy}
                   />
-                  <span>
+                  <span className="model-details">
                     <strong>{m.name}</strong>
                     <span className="model-meta">
                       {m.maker} · {c === 'openrouter' ? 'OpenRouter' : 'Direct'}

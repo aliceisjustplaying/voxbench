@@ -358,15 +358,18 @@ textarea:disabled {
   border-color: #becafa;
   background: #f8faff;
 }
-.model-choice > button {
+.model-choice > [data-slot='checkbox'] {
   margin-top: 3px;
   flex-shrink: 0;
 }
-.model-choice > span:nth-child(2) {
+.model-details {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  flex: 1;
+  gap: 4px;
   min-width: 0;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
 }
 .model-choice strong {
   font-weight: 600;
