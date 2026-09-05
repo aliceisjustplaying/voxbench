@@ -2,7 +2,7 @@
 /* oxlint-disable react/set-state-in-effect -- Restore browser storage after hydration and synchronize externally changed credentials. */
 import Script from 'next/script';
 import { readApiResponse } from '@/lib/api-response';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Mic,
   AudioLines,
@@ -29,7 +29,11 @@ import { OpenRouterConnect } from '@/components/lab/openrouter-connect';
 import { Connections } from '@/components/lab/connections';
 import { ResultCard, type Result } from '@/components/lab/result-card';
 import { models, connectionFor, type Keys } from '@/lib/models';
-import { importVocabulary, parseVocabulary } from '@/lib/comparison';
+import {
+  importVocabulary,
+  parseVocabulary,
+  rankTranscripts,
+} from '@/lib/comparison';
 import { prepareClip, downloadBlob, MAX_SECONDS, type Clip } from '@/lib/audio';
 import type {
   TranscriptionOutput,
@@ -207,6 +211,29 @@ export default function Home() {
     dictionaryUpload = useRef<HTMLInputElement>(null),
     mounted = useRef(true);
   const active = runs.find((r) => r.id === activeId);
+  const ranking = useMemo(
+    () =>
+      !active
+        ? null
+        : active.results.some((r) => ['queued', 'running'].includes(r.status))
+          ? {
+              basis: null,
+              rank: {},
+              order: active.results.map((r) => r.id),
+            }
+          : rankTranscripts(
+              active.results.map((r) => ({ id: r.id, text: r.output?.text })),
+              active.reference,
+            ),
+    [active],
+  );
+  function setRunReference(text: string) {
+    if (active)
+      setRuns((old) =>
+        old.map((r) => (r.id === active.id ? { ...r, reference: text } : r)),
+      );
+    else setReference(text);
+  }
   const keyCount = Object.values(keys).filter((v) => v?.trim()).length;
   const available = models
     .filter((m) => keys[connectionFor(m, keys)]?.trim())
@@ -390,7 +417,6 @@ export default function Home() {
       diagnostics: undefined,
       output: undefined,
       note: undefined,
-      preferred: false,
     });
     try {
       const response = await fetch('/api/transcribe', {
@@ -701,8 +727,9 @@ export default function Home() {
         <div>
           <h1>Which speech-to-text model hears you best?</h1>
           <p>
-            Record a take and read 11 transcripts side by side. Free trial, your
-            own keys, or log in with OpenRouter.
+            Record a take, read 11 transcripts side by side, and pick the one
+            that got you right. Free trial, your own keys, or log in with
+            OpenRouter.
           </p>
         </div>
       </section>
@@ -1137,28 +1164,19 @@ export default function Home() {
         ) : null}
         <details className="reference" open={!!active}>
           <summary>
-            Reference <span>What you said · optional</span>
+            Reference <span>What you actually said</span>
           </summary>
           <textarea
             aria-label="Reference transcript"
             maxLength={10000}
             rows={3}
             value={active ? active.reference : reference}
-            onChange={(e) => {
-              const t = e.target.value;
-              if (active)
-                setRuns((old) =>
-                  old.map((r) =>
-                    r.id === active.id ? { ...r, reference: t } : r,
-                  ),
-                );
-              else setReference(t);
-            }}
-            placeholder="The exact words you said. Include hesitations to score them. Stays in your browser."
+            onChange={(e) => setRunReference(e.target.value)}
+            placeholder="Click “This is what I said” on the closest transcript, then fix any wrong words here. Stays in your browser."
           />
           <p>
             Word errors count substituted, missing, and extra words, ignoring
-            case and punctuation. Scores use the raw transcript.
+            case and punctuation.
           </p>
         </details>
         {active ? (
@@ -1182,19 +1200,35 @@ export default function Home() {
                 {active.results.length} done
               </span>
             </div>
+            {ranking?.basis && (
+              <p className="ranking-note">
+                {ranking.basis === 'reference'
+                  ? 'Ranked by word errors against your reference.'
+                  : 'Ranked by agreement between models. Click “This is what I said” on the correct transcript to rank by accuracy instead.'}
+              </p>
+            )}
             <div className="result-grid">
-              {active.results.map((r) => (
-                <ResultCard
-                  key={active.id + r.id}
-                  result={r}
-                  reference={active.reference}
-                  terms={active.terms}
-                  lowercase={view === 'lowercase'}
-                  busy={busy}
-                  onRetry={() => retry(active, r.id)}
-                  onChange={(patch) => updateResult(active.id, r.id, patch)}
-                />
-              ))}
+              {(ranking?.order ?? [])
+                .map((id) => active.results.find((r) => r.id === id)!)
+                .map((r) => (
+                  <ResultCard
+                    key={active.id + r.id}
+                    result={r}
+                    rank={ranking?.rank[r.id]}
+                    isReference={
+                      !!r.output && r.output.text === active.reference
+                    }
+                    reference={active.reference}
+                    terms={active.terms}
+                    lowercase={view === 'lowercase'}
+                    busy={busy}
+                    onRetry={() => retry(active, r.id)}
+                    onChange={(patch) => updateResult(active.id, r.id, patch)}
+                    onUseAsReference={() =>
+                      setRunReference(r.output?.text ?? '')
+                    }
+                  />
+                ))}
             </div>
             <p className="timing-note">
               Time covers upload and processing of the whole file. Up to three

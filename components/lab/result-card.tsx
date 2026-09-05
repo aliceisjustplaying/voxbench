@@ -1,6 +1,12 @@
 'use client';
 import { useMemo, useState } from 'react';
-import { Check, Copy, Loader2, RotateCcw, Star } from 'lucide-react';
+import {
+  Check,
+  Copy,
+  Loader2,
+  MessageSquareQuote,
+  RotateCcw,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { models } from '@/lib/models';
 import { compareWords, vocabularyHits } from '@/lib/comparison';
@@ -15,24 +21,29 @@ export type Result = {
   error?: string;
   diagnostics?: ProviderDiagnostics;
   note?: string;
-  preferred?: boolean;
 };
 export function ResultCard({
   result,
+  rank,
+  isReference,
   reference,
   terms,
   lowercase,
   busy,
   onRetry,
   onChange,
+  onUseAsReference,
 }: {
   result: Result;
+  rank?: number;
+  isReference: boolean;
   reference: string;
   terms: string[];
   lowercase: boolean;
   busy: boolean;
   onRetry: () => void;
   onChange: (patch: Partial<Result>) => void;
+  onUseAsReference: () => void;
 }) {
   const m = models.find((x) => x.id === result.id)!;
   const [copied, setCopied] = useState(false);
@@ -58,10 +69,13 @@ export function ResultCard({
     }
   }
   return (
-    <article className={'result-card ' + (result.preferred ? 'preferred' : '')}>
+    <article className={'result-card ' + (isReference ? 'is-reference' : '')}>
       <div className="result-top">
         <div>
-          <span className="eyebrow">{m.maker}</span>
+          <span className="eyebrow">
+            {rank ? <b className="rank">#{rank}</b> : null}
+            {m.maker}
+          </span>
           <h3>{m.name}</h3>
         </div>
         <span className={'state ' + result.status}>
@@ -108,11 +122,11 @@ export function ResultCard({
             <Button
               variant="ghost"
               size="sm"
-              aria-pressed={!!result.preferred}
-              onClick={() => onChange({ preferred: !result.preferred })}
+              aria-pressed={isReference}
+              onClick={onUseAsReference}
             >
-              <Star fill={result.preferred ? 'currentColor' : 'none'} />
-              {result.preferred ? 'Preferred' : 'Prefer'}
+              <MessageSquareQuote />
+              {isReference ? 'Your reference' : 'This is what I said'}
             </Button>
           </div>
           {copyError ? (

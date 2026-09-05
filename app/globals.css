@@ -539,9 +539,21 @@ button.key-status {
   border-bottom: 1px solid var(--border);
   min-width: 0;
 }
-.result-card.preferred {
+.result-card.is-reference {
   outline: 2px solid var(--primary);
   outline-offset: -2px;
+}
+.result-top .rank {
+  display: inline-block;
+  font-weight: 700;
+  color: var(--primary);
+  letter-spacing: 0;
+  margin-right: 8px;
+}
+.ranking-note {
+  font-size: 13px;
+  color: var(--muted-foreground);
+  margin: -6px 0 12px;
 }
 .result-top {
   padding: 20px 18px 15px;

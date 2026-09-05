@@ -32,7 +32,7 @@ test('vocabulary matches whole phrases rather than substrings', () => {
     ['Codex', 'New York'],
   );
 });
-import { importVocabulary } from '../lib/comparison.ts';
+import { importVocabulary, rankTranscripts } from '../lib/comparison.ts';
 test('imports Monologue words preserving multi-word terms, exact spelling and ordering', () => {
   assert.deepEqual(
     importVocabulary(
@@ -51,4 +51,25 @@ test('imports Monologue words preserving multi-word terms, exact spelling and or
   ]);
   assert.throws(() => importVocabulary('{"words":[{"id":1}]}'));
   assert.throws(() => importVocabulary('{bad}'));
+});
+test('ranks by reference when given, otherwise by agreement between transcripts', () => {
+  const items = [
+    { id: 'a', text: 'hey alice order the sourdough starter' },
+    { id: 'b', text: 'hey alex order the sour dough starter' },
+    { id: 'c', text: 'hey alice order the sourdough starter' },
+    { id: 'd' },
+  ];
+  const consensus = rankTranscripts(items, '');
+  assert.equal(consensus.basis, 'consensus');
+  assert.deepEqual(consensus.order.slice(0, 2).sort(), ['a', 'c']);
+  assert.equal(consensus.order.at(-1), 'd');
+  assert.equal(consensus.rank.b, 3);
+  assert.equal(consensus.rank.d, undefined);
+  const scored = rankTranscripts(
+    items,
+    'hey alex order the sour dough starter',
+  );
+  assert.equal(scored.basis, 'reference');
+  assert.equal(scored.order[0], 'b');
+  assert.equal(rankTranscripts([items[0], items[3]], '').basis, null);
 });
