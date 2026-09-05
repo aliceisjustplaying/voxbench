@@ -159,17 +159,7 @@ test('AssemblyAI explicitly pins the model rather than falling back to a weaker 
   assert.equal(out.text, 'hello');
   assert.equal(n, 2);
 });
-test('Direct Mistral and Deepgram send provider-native vocabulary hints', async () => {
-  await transcribe(
-    { ...base, id: 'voxtral', connection: 'mistral' },
-    new AbortController().signal,
-    async (_url, init) => {
-      const f = init?.body as FormData;
-      assert.equal(f.get('model'), 'voxtral-mini-2602');
-      assert.deepEqual(f.getAll('context_bias'), ['Codex']);
-      return ok({ text: 'Hi' });
-    },
-  );
+test('Direct Deepgram sends provider-native vocabulary hints', async () => {
   await transcribe(
     { ...base, id: 'nova', connection: 'deepgram' },
     new AbortController().signal,
@@ -249,4 +239,33 @@ test('uses Worker-compatible redirect mode and never follows provider redirects'
     /Provider redirected/,
   );
   assert.equal(calls, 1);
+});
+
+test('shows nested OpenRouter provider errors and redacts keys', async () => {
+  await assert.rejects(
+    () =>
+      transcribe(
+        { ...base, id: 'voxtral', connection: 'openrouter' },
+        new AbortController().signal,
+        async () =>
+          Response.json(
+            {
+              error: {
+                message: 'Provider returned error',
+                metadata: {
+                  raw: JSON.stringify({
+                    message: 'Invalid context_bias ' + base.key,
+                  }),
+                },
+              },
+            },
+            { status: 400 },
+          ),
+      ),
+    (error) => {
+      assert.match(String(error), /OpenRouter:.*Invalid context_bias/);
+      assert.doesNotMatch(String(error), /test-key-not-real/);
+      return true;
+    },
+  );
 });

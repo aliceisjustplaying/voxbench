@@ -4,7 +4,6 @@ export type Connection =
   | 'gemini'
   | 'elevenlabs'
   | 'assemblyai'
-  | 'mistral'
   | 'deepgram';
 export type Model = {
   id: string;
@@ -60,9 +59,7 @@ export const models: Model[] = [
     maker: 'Mistral',
     connection: 'openrouter',
     model: 'mistralai/voxtral-mini-transcribe',
-    direct: 'mistral',
-    directModel: 'voxtral-mini-2602',
-    vocabulary: 'Context hints · direct key optional',
+    vocabulary: 'Hints via OpenRouter; forwarding unverified',
     docs: 'https://docs.mistral.ai/models/voxtral-mini-transcribe-26-02',
   },
   {
@@ -157,12 +154,6 @@ export const connections: {
     name: 'AssemblyAI',
     url: 'https://www.assemblyai.com/dashboard/signup',
     note: 'Universal-3.5 Pro. Audio is uploaded to AssemblyAI for its transcription job.',
-  },
-  {
-    id: 'mistral',
-    name: 'Mistral · optional direct key',
-    url: 'https://console.mistral.ai/',
-    note: 'Uses Mistral directly when entered, including context hints.',
   },
   {
     id: 'deepgram',

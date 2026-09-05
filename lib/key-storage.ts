@@ -12,12 +12,19 @@ export function parseKeys(json: string): Keys {
     throw new Error('The backup must be a JSON object.');
   const allowed = new Set<string>(connections.map((c) => c.id));
   const entries = Object.entries(value);
-  if (entries.some(([id, key]) => !allowed.has(id) || typeof key !== 'string'))
+  if (
+    entries.some(
+      ([id, key]) =>
+        (!allowed.has(id) && id !== 'mistral') || typeof key !== 'string',
+    )
+  )
     throw new Error(
       'The backup contains an unknown provider or a value that is not text.',
     );
   return Object.fromEntries(
-    entries.map(([id, key]) => [id, (key as string).trim()]),
+    entries
+      .filter(([id]) => allowed.has(id))
+      .map(([id, key]) => [id, (key as string).trim()]),
   );
 }
 export function saveKeys(

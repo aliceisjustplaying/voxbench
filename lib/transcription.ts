@@ -120,15 +120,32 @@ function safeMessage(data: Json, status: number, key: string) {
           : status >= 500
             ? 'Provider is temporarily unavailable'
             : 'Provider rejected the request';
-  const detail =
-    typeof data.error?.message === 'string'
-      ? data.error.message
-      : typeof data.detail === 'string'
-        ? data.detail
-        : typeof data.error === 'string'
-          ? data.error
-          : '';
-  return `${reason} (HTTP ${status}). ${detail.replaceAll(key, '[redacted]').slice(0, 220)}`.trim();
+  const extract = (value: unknown): string => {
+    if (typeof value === 'string') return value;
+    if (!value || typeof value !== 'object') return '';
+    const v = value as Json;
+    if (typeof v.error?.message === 'string') return v.error.message;
+    if (typeof v.message === 'string') return v.message;
+    if (typeof v.detail === 'string') return v.detail;
+    if (Array.isArray(v.detail))
+      return v.detail
+        .map((item: Json) => (typeof item?.msg === 'string' ? item.msg : ''))
+        .filter(Boolean)
+        .join('; ');
+    return typeof v.error === 'string' ? v.error : '';
+  };
+  let upstream: unknown = data.error?.metadata?.raw ?? data.metadata?.raw;
+  if (typeof upstream === 'string') {
+    try {
+      upstream = JSON.parse(upstream);
+    } catch {
+      /* Some providers return plain text. */
+    }
+  }
+  const detail = [
+    ...new Set([extract(data), extract(upstream)].filter(Boolean)),
+  ].join(' — ');
+  return `${reason} (HTTP ${status}). ${detail.replaceAll(key, '[redacted]').slice(0, 700)}`.trim();
 }
 export async function transcribe(
   input: TranscriptionInput,
@@ -173,7 +190,10 @@ export async function transcribe(
       );
     }
     if (!response.ok)
-      throw new RequestError(safeMessage(data, response.status, key), 502);
+      throw new RequestError(
+        `${connection === 'openrouter' ? 'OpenRouter' : connection + ' direct'}: ${safeMessage(data, response.status, key)}`,
+        502,
+      );
     return data;
   };
   const postJson = (
@@ -348,23 +368,6 @@ export async function transcribe(
       throw new RequestError(safeMessage(result, 400, key), 502);
     transcript = text(result.text);
     if (terms.length) hints = 'Keyterm hints sent directly.';
-  } else if (connection === 'mistral') {
-    const form = new FormData();
-    form.append('file', blob, 'take.wav');
-    form.append('model', model);
-    if (english) form.append('language', 'en');
-    for (const t of terms) form.append('context_bias', t);
-    const data = await request(
-      'https://api.mistral.ai/v1/audio/transcriptions',
-      {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${key}` },
-        body: form,
-      },
-    );
-    transcript = text(data.text);
-    settings = { ...settings, context_bias: terms };
-    if (terms.length) hints = 'Context hints sent directly.';
   } else if (connection === 'deepgram') {
     const params = new URLSearchParams({
       model: 'nova-3',
