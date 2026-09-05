@@ -19,6 +19,8 @@ export type Result = {
 export function ResultCard({
   result,
   rank,
+  anchor,
+  score: ranked,
   isReference,
   reference,
   terms,
@@ -30,6 +32,8 @@ export function ResultCard({
 }: {
   result: Result;
   rank?: number;
+  anchor: string;
+  score?: { basis: 'reference' | 'consensus'; value: number };
   isReference: boolean;
   reference: string;
   terms: string[];
@@ -64,6 +68,7 @@ export function ResultCard({
   }
   return (
     <article
+      id={anchor}
       className={'result-card ' + (isReference ? 'is-reference' : '')}
       style={{ viewTransitionName: 'result-' + result.id }}
     >
@@ -98,8 +103,14 @@ export function ResultCard({
               {(result.output.elapsedMs / 1000).toFixed(1)}s <small>time</small>
             </span>
             <span>
-              {score ? `${(score.rate * 100).toFixed(1)}%` : '—'}{' '}
-              <small>word errors</small>
+              {ranked?.basis === 'reference'
+                ? `${(ranked.value * 100).toFixed(1)}%`
+                : ranked
+                  ? `${Math.round((1 - ranked.value) * 100)}%`
+                  : '—'}{' '}
+              <small>
+                {ranked?.basis === 'consensus' ? 'agreement' : 'word errors'}
+              </small>
             </span>
             <span>
               {result.output.cost !== null

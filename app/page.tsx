@@ -255,6 +255,7 @@ export default function Home() {
           ? {
               basis: null,
               rank: {},
+              score: {},
               order: active.results.map((r) => r.id),
             }
           : rankTranscripts(
@@ -1284,11 +1285,33 @@ export default function Home() {
               </span>
             </div>
             {ranking?.basis && (
-              <p className="ranking-note">
-                {ranking.basis === 'reference'
-                  ? 'Ranked by word errors against your reference.'
-                  : 'Ranked by agreement between models. Mark the closest match to rank against it instead.'}
-              </p>
+              <section className="leaderboard" aria-label="Ranking">
+                <p>
+                  {ranking.basis === 'reference'
+                    ? 'Ranked by word errors against your reference.'
+                    : 'Ranked by agreement with the other models. Mark the closest match on a card to rank by accuracy instead.'}
+                </p>
+                <ol>
+                  {ranking.order
+                    .filter((id) => ranking.rank[id])
+                    .map((id) => {
+                      const m = models.find((x) => x.id === id)!;
+                      return (
+                        <li key={id}>
+                          <a href={'#result-' + active.id + '-' + id}>
+                            <b>{ranking.rank[id]}</b>
+                            <span>{m.name}</span>
+                            <small>
+                              {ranking.basis === 'reference'
+                                ? `${(ranking.score[id] * 100).toFixed(1)}% word errors`
+                                : `${Math.round((1 - ranking.score[id]) * 100)}% agreement`}
+                            </small>
+                          </a>
+                        </li>
+                      );
+                    })}
+                </ol>
+              </section>
             )}
             <div className="result-grid">
               {(sortByRank && ranking?.basis
@@ -1301,6 +1324,12 @@ export default function Home() {
                   key={active.id + r.id}
                   result={r}
                   rank={ranking?.rank[r.id]}
+                  anchor={'result-' + active.id + '-' + r.id}
+                  score={
+                    ranking?.basis && ranking.score[r.id] !== undefined
+                      ? { basis: ranking.basis, value: ranking.score[r.id] }
+                      : undefined
+                  }
                   isReference={!!r.output && r.output.text === active.reference}
                   reference={active.reference}
                   terms={active.terms}

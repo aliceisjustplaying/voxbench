@@ -550,10 +550,49 @@ button.key-status {
   letter-spacing: 0;
   margin-right: 8px;
 }
-.ranking-note {
+.leaderboard {
+  margin: 0 0 16px;
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}
+.leaderboard p {
   font-size: 13px;
   color: var(--muted-foreground);
-  margin: -6px 0 12px;
+  margin: 0 0 8px;
+}
+.leaderboard ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 2px 24px;
+}
+.leaderboard a {
+  display: grid;
+  grid-template-columns: 24px 1fr auto;
+  align-items: baseline;
+  gap: 8px;
+  padding: 4px 0;
+  font-size: 14px;
+  border-bottom: 1px solid var(--border);
+}
+.leaderboard a:hover span {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.leaderboard b {
+  color: var(--primary);
+  font-variant-numeric: tabular-nums;
+}
+.leaderboard small {
+  font-size: 12px;
+  color: var(--muted-foreground);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.result-card {
+  scroll-margin-top: 16px;
 }
 .result-top {
   padding: 20px 18px 15px;

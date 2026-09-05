@@ -114,6 +114,8 @@ export function importVocabulary(contents: string): string[] {
 export type Ranking = {
   basis: 'reference' | 'consensus' | null;
   rank: Record<string, number>;
+  /** Word error rate against the reference, or mean distance to the other transcripts. */
+  score: Record<string, number>;
   order: string[];
 };
 /**
@@ -130,7 +132,7 @@ export function rankTranscripts(
   );
   const useReference = words(reference).length > 0;
   if (scored.length < (useReference ? 1 : 2))
-    return { basis: null, rank: {}, order: items.map((x) => x.id) };
+    return { basis: null, rank: {}, score: {}, order: items.map((x) => x.id) };
   const distance = (a: string, b: string) => compareWords(a, b)?.rate ?? 1;
   const score = new Map(
     scored.map((x) => [
@@ -157,6 +159,7 @@ export function rankTranscripts(
   return {
     basis: useReference ? 'reference' : 'consensus',
     rank,
+    score: Object.fromEntries(score),
     order: [
       ...ranked.map((x) => x.id),
       ...items.filter((x) => !score.has(x.id)).map((x) => x.id),
