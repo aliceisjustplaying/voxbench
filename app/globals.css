@@ -381,6 +381,20 @@ textarea:disabled {
 .key-dot.present {
   background: var(--primary);
 }
+.key-status {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--muted-foreground);
+  white-space: nowrap;
+}
+button.key-status {
+  color: var(--primary);
+  font-weight: 500;
+}
+.model-choice:has(> [data-slot='checkbox']:disabled) {
+  cursor: default;
+}
 .compare-bar {
   display: flex;
   align-items: center;

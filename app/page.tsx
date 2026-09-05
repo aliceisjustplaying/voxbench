@@ -189,10 +189,11 @@ export default function Home() {
     mounted = useRef(true);
   const active = runs.find((r) => r.id === activeId);
   const keyCount = Object.values(keys).filter((v) => v?.trim()).length;
-  const ready = selected.filter((id) => {
-    const m = models.find((m) => m.id === id)!;
-    return keys[connectionFor(m, keys)]?.trim();
-  }).length;
+  const available = models
+    .filter((m) => keys[connectionFor(m, keys)]?.trim())
+    .map((m) => m.id);
+  const chosen = selected.filter((id) => available.includes(id));
+  const ready = chosen.length;
   useEffect(() => {
     mounted.current = true;
     return () => {
@@ -410,12 +411,12 @@ export default function Home() {
     }
   }
   async function compare() {
-    if (!clip || (mode === 'own' && !selected.length) || busyRef.current)
-      return;
+    if (busyRef.current) return;
     if (mode === 'own' && !ready) {
       setKeysOpen(true);
       return;
     }
+    if (!clip) return;
     if (
       mode === 'free' &&
       (clip.duration > 30 || !demoToken || !demo.remaining)
@@ -457,7 +458,7 @@ export default function Home() {
       english,
       reference,
       sponsored: mode === 'free',
-      results: (mode === 'free' ? FREE_MODELS : selected).map((id) => ({
+      results: (mode === 'free' ? FREE_MODELS : chosen).map((id) => ({
         id,
         status: 'queued',
       })),
@@ -521,7 +522,7 @@ export default function Home() {
       }
       return;
     }
-    const queue = [...selected];
+    const queue = [...chosen];
     try {
       await Promise.all(
         Array.from({ length: 3 }, async () => {
@@ -896,7 +897,7 @@ export default function Home() {
               disabled={busy || mode === 'free'}
               onClick={() =>
                 setSelected(
-                  selected.length === models.length
+                  ready === available.length && ready > 0
                     ? []
                     : models.map((m) => m.id),
                 )
@@ -904,7 +905,7 @@ export default function Home() {
             >
               {mode === 'free'
                 ? 'Free trial: 3 models'
-                : selected.length === models.length
+                : ready === available.length && ready > 0
                   ? 'Deselect all'
                   : 'Select all'}
             </button>
@@ -921,24 +922,26 @@ export default function Home() {
                     htmlFor={'model-' + m.id}
                     className={
                       'model-choice ' +
-                      (mode === 'free' || selected.includes(m.id)
+                      (mode === 'free' || (hasKey && selected.includes(m.id))
                         ? 'chosen'
                         : '')
                     }
                     key={m.id}
                   >
-                    <Checkbox
-                      id={'model-' + m.id}
-                      checked={mode === 'free' || selected.includes(m.id)}
-                      onCheckedChange={(checked) =>
-                        setSelected((old) =>
-                          checked
-                            ? [...old, m.id]
-                            : old.filter((id) => id !== m.id),
-                        )
-                      }
-                      disabled={busy || mode === 'free'}
-                    />
+                    {mode === 'own' && (
+                      <Checkbox
+                        id={'model-' + m.id}
+                        checked={hasKey && selected.includes(m.id)}
+                        onCheckedChange={(checked) =>
+                          setSelected((old) =>
+                            checked
+                              ? [...old, m.id]
+                              : old.filter((id) => id !== m.id),
+                          )
+                        }
+                        disabled={busy || !hasKey}
+                      />
+                    )}
                     <span className="model-details">
                       <strong>{m.name}</strong>
                       <span className="model-meta">
@@ -960,19 +963,20 @@ export default function Home() {
                           : m.vocabulary}
                       </small>
                     </span>
-                    <span
-                      className={
-                        'key-dot ' +
-                        (mode === 'free' || hasKey ? 'present' : '')
-                      }
-                      title={
-                        mode === 'free'
-                          ? 'Included in your free comparison'
-                          : hasKey
-                            ? 'Key added'
-                            : 'No key'
-                      }
-                    />
+                    {mode === 'free' ? (
+                      <span className="key-status">Included</span>
+                    ) : hasKey ? (
+                      <span className="key-dot present" title="Key added" />
+                    ) : (
+                      <button
+                        type="button"
+                        className="key-status text-button"
+                        disabled={busy}
+                        onClick={() => setKeysOpen(true)}
+                      >
+                        Add key
+                      </button>
+                    )}
                   </label>
                 );
               })}
@@ -987,14 +991,12 @@ export default function Home() {
           <div className="compare-bar">
             <div>
               <strong>
-                {mode === 'free'
-                  ? '3 models included'
-                  : `${selected.length} selected`}
+                {mode === 'free' ? '3 models included' : `${ready} selected`}
               </strong>
               <span>
                 {mode === 'free'
                   ? `${demo.remaining ?? 0} free comparisons left`
-                  : `${ready} with keys`}
+                  : `${available.length} of ${models.length} available`}
               </span>
             </div>
             {busy ? (
@@ -1005,15 +1007,15 @@ export default function Home() {
             ) : (
               <Button
                 disabled={
-                  !clip ||
                   preparing ||
                   recording ||
                   (mode === 'free'
-                    ? !demoToken ||
+                    ? !clip ||
+                      !demoToken ||
                       !demo.remaining ||
                       clip.duration > 30 ||
                       clip.source !== 'recording'
-                    : !selected.length)
+                    : ready > 0 && !clip)
                 }
                 onClick={compare}
               >
@@ -1039,11 +1041,12 @@ export default function Home() {
               use your own keys.
             </p>
           )}
-          <p className="billing-note">
-            {mode === 'free'
-              ? 'Each attempt uses one free comparison, including failed ones. Limits apply per browser and network.'
-              : 'Only models with a key run.'}
-          </p>
+          {mode === 'free' && (
+            <p className="billing-note">
+              Each attempt uses one free comparison, including failed ones.
+              Limits apply per browser and network.
+            </p>
+          )}
         </div>
       </section>
       {error ? (
