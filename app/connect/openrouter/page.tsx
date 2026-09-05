@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
+import { readApiResponse } from '@/lib/api-response';
 import { AUTH_PENDING, validateCallback } from '@/lib/openrouter-auth';
 import { mergeSavedKeys } from '@/lib/key-storage';
 export default function Callback() {
@@ -23,7 +24,7 @@ export default function Callback() {
           signal: AbortSignal.timeout(30_000),
           redirect: 'error',
         });
-        const data = (await response.json()) as { key?: string };
+        const data = await readApiResponse<{ key?: string }>(response);
         if (!response.ok || typeof data.key !== 'string' || data.key.length < 8)
           throw new Error(
             'OpenRouter could not complete the connection. Close this window and try connecting again.',

@@ -1,3 +1,4 @@
+import { Buffer } from 'node:buffer';
 import { models, type Connection } from './models.ts';
 
 export type TranscriptionInput = {
@@ -18,7 +19,24 @@ export type TranscriptionOutput = {
   settings: Record<string, unknown>;
   audioHash: string;
 };
-type Json = Record<string, any>;
+type Json = Record<string, unknown>;
+type ProviderResponse = {
+  error?: unknown;
+  metadata?: { raw?: unknown };
+  text?: unknown;
+  transcript?: unknown;
+  usage?: { cost?: number };
+  status?: string;
+  upload_url?: string;
+  id?: string;
+  steps?: { type?: string; content?: { text?: string }[] }[];
+  results?: { channels?: { alternatives?: { transcript?: string }[] }[] };
+};
+function object(value: unknown): Json {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Json)
+    : {};
+}
 type Fetcher = typeof fetch;
 export type ProviderDiagnostics = {
   provider: string;
@@ -62,7 +80,6 @@ export function validateInput(raw: unknown): TranscriptionInput {
     typeof r.audio !== 'string' ||
     r.audio.length > 2_600_000 ||
     r.audio.length < 100 ||
-    !/^[A-Za-z0-9+/]+={0,2}$/.test(r.audio) ||
     r.audio.length % 4
   )
     throw new RequestError('Use a WAV recording of 60 seconds or less.');
@@ -74,7 +91,7 @@ export function validateInput(raw: unknown): TranscriptionInput {
         typeof s !== 'string' ||
         s.length > 49 ||
         s.trim().split(/\s+/).length > 5 ||
-        /[\r\n<>{}\[\]\\]/.test(s),
+        /[\r\n<>{}[\]\\]/.test(s),
     )
   )
     throw new RequestError(
@@ -84,7 +101,7 @@ export function validateInput(raw: unknown): TranscriptionInput {
     throw new RequestError('Choose English or automatic language detection.');
   return {
     id: m.id,
-    connection: r.connection,
+    connection: r.connection as Connection,
     key: r.key.trim(),
     audio: r.audio,
     vocabulary: [
@@ -94,9 +111,14 @@ export function validateInput(raw: unknown): TranscriptionInput {
   };
 }
 export function wavBytes(audio: string) {
-  const decoded = atob(audio);
-  const bytes = Uint8Array.from(decoded, (c) => c.charCodeAt(0));
-  const v = new DataView(bytes.buffer);
+  const bytes = Buffer.from(audio, 'base64');
+  // Buffer's decoder is permissive: a native round trip rejects whitespace,
+  // URL-safe alphabets, bad padding and ignored characters without a JS regex.
+  if (bytes.toString('base64') !== audio)
+    throw new RequestError(
+      'Invalid audio encoding. Record or upload it again.',
+    );
+  const v = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const word = (at: number, n: number) =>
     String.fromCharCode(...bytes.subarray(at, at + n));
   if (
@@ -109,6 +131,8 @@ export function wavBytes(audio: string) {
     v.getUint16(20, true) !== 1 ||
     v.getUint16(22, true) !== 1 ||
     v.getUint32(24, true) !== 16000 ||
+    v.getUint32(28, true) !== 32000 ||
+    v.getUint16(32, true) !== 2 ||
     v.getUint16(34, true) !== 16 ||
     v.getUint32(40, true) !== bytes.length - 44 ||
     v.getUint32(4, true) !== bytes.length - 8 ||
@@ -125,7 +149,7 @@ function text(value: unknown): string {
     throw new RequestError('The provider returned no transcript text.', 502);
   return value;
 }
-function safeMessage(data: Json, status: number, key: string) {
+function safeMessage(data: ProviderResponse, status: number, key: string) {
   const reason =
     status === 401 || status === 403
       ? 'Key rejected or model access unavailable'
@@ -140,17 +164,22 @@ function safeMessage(data: Json, status: number, key: string) {
     if (typeof value === 'string') return value;
     if (!value || typeof value !== 'object') return '';
     const v = value as Json;
-    if (typeof v.error?.message === 'string') return v.error.message;
+    const error = object(v.error);
+    if (typeof error.message === 'string') return error.message;
     if (typeof v.message === 'string') return v.message;
     if (typeof v.detail === 'string') return v.detail;
     if (Array.isArray(v.detail))
       return v.detail
-        .map((item: Json) => (typeof item?.msg === 'string' ? item.msg : ''))
+        .map((item: unknown) => {
+          const msg = object(item).msg;
+          return typeof msg === 'string' ? msg : '';
+        })
         .filter(Boolean)
         .join('; ');
     return typeof v.error === 'string' ? v.error : '';
   };
-  let upstream: unknown = data.error?.metadata?.raw ?? data.metadata?.raw;
+  let upstream: unknown =
+    object(object(data.error).metadata).raw ?? data.metadata?.raw;
   if (typeof upstream === 'string') {
     try {
       upstream = JSON.parse(upstream);
@@ -163,27 +192,33 @@ function safeMessage(data: Json, status: number, key: string) {
   ].join(' — ');
   return `${reason} (HTTP ${status}). ${detail.replaceAll(key, '[redacted]').slice(0, 700)}`.trim();
 }
+export async function prepareAudio(audio: string | Uint8Array<ArrayBuffer>) {
+  const bytes = typeof audio === 'string' ? wavBytes(audio) : audio;
+  const hash = Buffer.from(
+    await crypto.subtle.digest('SHA-256', bytes),
+  ).toString('hex');
+  return { bytes, hash, blob: new Blob([bytes], { type: 'audio/wav' }) };
+}
+export type PreparedAudio = Awaited<ReturnType<typeof prepareAudio>>;
 export async function transcribe(
   input: TranscriptionInput,
   signal: AbortSignal,
   fetcher: Fetcher = fetch,
+  prepared?: PreparedAudio,
 ): Promise<TranscriptionOutput> {
   const start = Date.now(),
     m = models.find((m) => m.id === input.id)!;
   const { key, connection, vocabulary: terms, english } = input;
-  const bytes = wavBytes(input.audio);
-  const hash = Array.from(
-    new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)),
-  )
-    .map((x) => x.toString(16).padStart(2, '0'))
-    .join('');
-  const blob = new Blob([bytes], { type: 'audio/wav' });
+  const { hash, blob } = prepared ?? (await prepareAudio(input.audio));
   const model = connection === m.direct ? m.directModel! : m.model;
   let hints = terms.length
     ? 'Not sent: this connection has no vocabulary adapter.'
     : 'Off';
   let settings: Json = { language: english ? 'en' : 'auto' };
-  const request = async (url: string, init: RequestInit): Promise<Json> => {
+  const request = async (
+    url: string,
+    init: RequestInit,
+  ): Promise<ProviderResponse> => {
     // Workers supports manual/follow, but rejects the browser's "error" mode.
     // Reject redirects ourselves so credentials never follow another URL.
     const response = await fetcher(url, {
@@ -193,7 +228,7 @@ export async function transcribe(
     });
     if (!response.ok) {
       const raw = await response.text();
-      let data: Json = {};
+      let data: ProviderResponse = {};
       try {
         data = JSON.parse(raw) ?? {};
       } catch {
@@ -259,9 +294,9 @@ export async function transcribe(
         diagnostics,
       );
     }
-    let data: Json;
+    let data: ProviderResponse;
     try {
-      data = (await response.json()) as Json;
+      data = (await response.json()) as ProviderResponse;
     } catch {
       throw new RequestError(
         `Provider returned an unreadable response (HTTP ${response.status}).`,
@@ -382,10 +417,10 @@ export async function transcribe(
         502,
       );
     const parts = (data.steps || [])
-      .filter((step: Json) => step.type === 'model_output')
-      .flatMap((step: Json) => step.content || [])
-      .filter((part: Json) => typeof part.text === 'string')
-      .map((part: Json) => part.text);
+      .filter((step) => step.type === 'model_output')
+      .flatMap((step) => step.content || [])
+      .filter((part) => typeof part.text === 'string')
+      .map((part) => part.text);
     if (!parts.length)
       throw new RequestError('Gemini completed without transcript text.', 502);
     transcript = parts.join('\n');
@@ -439,7 +474,13 @@ export async function transcribe(
     if (typeof job.id !== 'string' || !/^[a-zA-Z0-9-]+$/.test(job.id))
       throw new RequestError('AssemblyAI did not return a job reference.', 502);
     let result = job;
+    let polls = 0;
     while (result.status !== 'completed' && result.status !== 'error') {
+      if (polls++ >= 40)
+        throw new RequestError(
+          'AssemblyAI is still processing after 40 checks. Stop waiting here; the provider may still finish and charge for this job.',
+          504,
+        );
       await new Promise<void>((resolve, reject) => {
         const onAbort = () => {
           clearTimeout(timer);
@@ -463,7 +504,7 @@ export async function transcribe(
     if (terms.length) hints = 'Keyterm hints sent directly.';
   } else if (connection === 'deepgram') {
     const params = new URLSearchParams({
-      model: 'nova-3',
+      model,
       punctuate: 'true',
       smart_format: 'false',
       ...(english ? { language: 'en' } : { detect_language: 'true' }),

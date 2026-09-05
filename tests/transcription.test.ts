@@ -1,6 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { transcribe, validateInput } from '../lib/transcription.ts';
+import {
+  RequestError,
+  transcribe,
+  validateInput,
+} from '../lib/transcription.ts';
 import { connectionFor, models } from '../lib/models.ts';
 import type { TranscriptionInput } from '../lib/transcription.ts';
 function audio() {
@@ -47,7 +51,7 @@ test('Meta sends exact documented multipart parts and identical WAV bytes', asyn
         'Bearer test-key-not-real',
       );
       const form = await request.formData();
-      assert.deepEqual(JSON.parse(String(form.get('request'))), {
+      assert.deepEqual(JSON.parse(form.get('request') as string), {
         model: 'muse-voice-transcribe-1.0',
         mode: 'PUSH_TO_TALK',
         audioEncoding: 'WAV',
@@ -74,7 +78,7 @@ test('Gemini requests verbatim mode, includes vocabulary and rejects incomplete 
     input,
     new AbortController().signal,
     async (_url, init) => {
-      const b = JSON.parse(String(init?.body));
+      const b = JSON.parse(init!.body as string);
       assert.equal(b.store, false);
       assert.equal(b.input[0].data, base.audio);
       assert.deepEqual(
@@ -109,7 +113,7 @@ test('OpenRouter reports returned cost and discloses unavailable GPT vocabulary'
     { ...base, id: 'gpt', connection: 'openrouter' },
     new AbortController().signal,
     async (_url, init) => {
-      const b = JSON.parse(String(init?.body));
+      const b = JSON.parse(init!.body as string);
       assert.equal(b.model, 'openai/gpt-transcribe');
       assert.equal(b.input_audio.data, base.audio);
       assert.equal(b.prompt, undefined);
@@ -145,12 +149,12 @@ test('AssemblyAI explicitly pins the model rather than falling back to a weaker 
     async (_url, init) => {
       if (n++ === 0) {
         assert.deepEqual(
-          Buffer.from(await (init?.body as Blob).arrayBuffer()),
+          Buffer.from(await (init!.body as Blob).arrayBuffer()),
           audio(),
         );
         return ok({ upload_url: 'https://cdn.assemblyai.com/test' });
       }
-      const b = JSON.parse(String(init?.body));
+      const b = JSON.parse(init!.body as string);
       assert.deepEqual(b.speech_models, ['universal-3-5-pro']);
       assert.deepEqual(b.keyterms_prompt, ['Codex']);
       assert.equal(b.disfluencies, true);
@@ -165,11 +169,11 @@ test('Direct Deepgram sends provider-native vocabulary hints', async () => {
     { ...base, id: 'nova', connection: 'deepgram' },
     new AbortController().signal,
     async (url, init) => {
-      const u = new URL(String(url));
+      const u = new URL(url as string);
       assert.deepEqual(u.searchParams.getAll('keyterm'), ['Codex']);
       assert.equal(u.searchParams.get('smart_format'), 'false');
       assert.deepEqual(
-        Buffer.from(await (init?.body as Blob).arrayBuffer()),
+        Buffer.from(await (init!.body as Blob).arrayBuffer()),
         audio(),
       );
       return ok({
@@ -183,7 +187,7 @@ test('unsupported vocabulary is disclosed instead of silently claiming it was ap
     { ...base, id: 'nova', connection: 'openrouter' },
     new AbortController().signal,
     async (_url, init) => {
-      assert.equal(JSON.parse(String(init?.body)).provider, undefined);
+      assert.equal(JSON.parse(init!.body as string).provider, undefined);
       return ok({ text: 'Hi' });
     },
   );
@@ -296,7 +300,8 @@ test('503 diagnostics preserve provider codes and request IDs while redacting cr
         ),
       ),
     (error) => {
-      const d = (error as any).diagnostics;
+      assert.ok(error instanceof RequestError);
+      const d = error.diagnostics!;
       assert.equal(d.status, 503);
       assert.equal(d.headers['x-fb-request-id'], 'request-123');
       assert.equal(d.headers['retry-after'], '60');
@@ -317,7 +322,8 @@ test('non-JSON provider failures retain readable diagnostic details', async () =
         async () => new Response('backend unavailable', { status: 503 }),
       ),
     (error) => {
-      assert.equal((error as any).diagnostics.response, 'backend unavailable');
+      assert.ok(error instanceof RequestError);
+      assert.equal(error.diagnostics?.response, 'backend unavailable');
       return true;
     },
   );
@@ -329,7 +335,7 @@ test('OpenRouter only sends supported MAI vocabulary; GPT and Voxtral disclose n
       { ...base, id, connection: 'openrouter' },
       new AbortController().signal,
       async (_url, init) => {
-        const body = JSON.parse(String(init?.body));
+        const body = JSON.parse(init!.body as string);
         assert.deepEqual(
           body.provider,
           id === 'mai'

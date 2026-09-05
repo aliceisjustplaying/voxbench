@@ -1,3 +1,4 @@
+import { networkGroup } from './network.ts';
 import { RequestError } from './transcription.ts';
 
 type Limiter = {
@@ -19,7 +20,7 @@ export async function checkRequestAccess(request: Request, env: AbuseControls) {
   // Fail closed if a deployment is missing its Cloudflare bindings.
   if (!env.IP_RATE_LIMITER || !env.KEY_RATE_LIMITER)
     throw new RequestError('Transcription is temporarily unavailable.', 503);
-  const ip = request.headers.get('CF-Connecting-IP') || 'local';
+  const ip = networkGroup(request.headers.get('CF-Connecting-IP') || 'local');
   if (!(await env.IP_RATE_LIMITER.limit({ key: ip })).success)
     throw new RequestError(
       'Too many requests. Wait one minute before trying again.',
@@ -47,10 +48,9 @@ export async function checkProviderAccess(
   const fingerprint = Array.from(new Uint8Array(digest), (n) =>
     n.toString(16).padStart(2, '0'),
   ).join('');
-  if (
-    !env.KEY_RATE_LIMITER ||
-    !(await env.KEY_RATE_LIMITER.limit({ key: fingerprint })).success
-  )
+  if (!env.KEY_RATE_LIMITER)
+    throw new RequestError('Transcription is temporarily unavailable.', 503);
+  if (!(await env.KEY_RATE_LIMITER.limit({ key: fingerprint })).success)
     throw new RequestError(
       'Too many requests for this API key. Wait one minute before trying again.',
       429,

@@ -56,6 +56,12 @@ function database() {
       'utf8',
     ),
   );
+  sqlite.exec(
+    readFileSync(
+      new URL('../migrations/0002_global_quota.sql', import.meta.url),
+      'utf8',
+    ),
+  );
   const adapter = {
     prepare: (sql: string) => ({
       bind: (...values: unknown[]) => ({

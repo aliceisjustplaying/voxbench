@@ -1,4 +1,5 @@
 'use client';
+/* oxlint-disable react/set-state-in-effect -- Reset UI/token state when mounting the external verification widget. */
 import { useEffect, useRef, useState } from 'react';
 type WidgetAPI = {
   render: (element: HTMLElement, options: Record<string, unknown>) => string;

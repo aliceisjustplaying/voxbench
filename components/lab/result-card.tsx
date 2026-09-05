@@ -113,7 +113,7 @@ export function ResultCard({
               onClick={() => onChange({ preferred: !result.preferred })}
             >
               <Star fill={result.preferred ? 'currentColor' : 'none'} />
-              {result.preferred ? 'A favourite' : 'Prefer this'}
+              {result.preferred ? 'A favorite' : 'Prefer this'}
             </Button>
           </div>
           {copyError ? (

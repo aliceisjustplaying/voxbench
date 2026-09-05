@@ -1,10 +1,14 @@
+import { Buffer } from 'node:buffer';
+import { networkGroup } from './network.ts';
 import type { AbuseControls } from './abuse-controls.ts';
 import { RequestError, validateInput, wavBytes } from './transcription.ts';
 export const DEMO_MODELS = ['gpt', 'voxtral', 'mai'] as const;
 export const DEMO_SECONDS = 30;
+export const DEMO_DAILY_LIMIT = 200;
 export type DemoEnv = AbuseControls & {
   DEMO_DB?: D1Database;
   DEMO_ENABLED?: string;
+  DEMO_COOKIE_SECRET?: string;
   VOXBENCH_DEMO_KEY?: string;
   TURNSTILE_SECRET?: string;
   TURNSTILE_SITE_KEY?: string;
@@ -14,6 +18,7 @@ export function demoEnabled(env: DemoEnv) {
     env.DEMO_ENABLED === 'true' &&
     env.TRANSCRIPTION_PAUSED !== 'true' &&
     !!env.VOXBENCH_DEMO_KEY &&
+    !!env.DEMO_COOKIE_SECRET &&
     !!env.TURNSTILE_SECRET &&
     !!env.TURNSTILE_SITE_KEY &&
     !!env.DEMO_DB
@@ -29,7 +34,8 @@ export function validateDemo(raw: unknown, key: string) {
     connection: 'openrouter',
     key,
   });
-  const seconds = (wavBytes(input.audio).length - 44) / 32000;
+  const bytes = wavBytes(input.audio);
+  const seconds = (bytes.length - 44) / 32000;
   if (seconds > DEMO_SECONDS || seconds < 0.15)
     throw new RequestError(
       'Free comparisons use recordings from 0.15 to 30 seconds. Record a shorter take.',
@@ -43,46 +49,48 @@ export function validateDemo(raw: unknown, key: string) {
       'Complete the verification checkbox before comparing.',
       403,
     );
-  return { input, token: r.token };
+  return { input, token: r.token, bytes };
 }
-async function digest(secret: string, value: string) {
+export async function trialIdentity(request: Request, secret: string) {
   const key = await crypto.subtle.importKey(
     'raw',
     new TextEncoder().encode(secret),
     { name: 'HMAC', hash: 'SHA-256' },
     false,
-    ['sign'],
+    ['sign', 'verify'],
   );
-  const bytes = new Uint8Array(
-    await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(value)),
-  );
-  return Array.from(bytes, (n) => n.toString(16).padStart(2, '0')).join('');
-}
-export async function trialIdentity(request: Request, secret: string) {
+  const sign = async (value: string) =>
+    Buffer.from(
+      await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(value)),
+    ).toString('hex');
   const saved = request.headers
     .get('cookie')
     ?.match(/(?:^|;\s*)__Host-voxbench_trial=([^;]+)/)?.[1];
   const [id, signature] = (saved || '').split('.');
-  let visitor = id;
-  if (
-    !/^[a-f0-9-]{36}$/.test(id || '') ||
-    signature !== (await digest(secret, 'visitor:' + id))
-  )
-    visitor = crypto.randomUUID();
-  const signed = visitor + '.' + (await digest(secret, 'visitor:' + visitor));
+  const existing =
+    /^[a-f0-9-]{36}$/.test(id || '') &&
+    /^[a-f0-9]{64}$/.test(signature || '') &&
+    (await crypto.subtle.verify(
+      'HMAC',
+      key,
+      Buffer.from(signature, 'hex'),
+      new TextEncoder().encode('visitor:' + id),
+    ));
+  const visitor = existing ? id : crypto.randomUUID();
+  const signed = visitor + '.' + (await sign('visitor:' + visitor));
   const ip = request.headers.get('CF-Connecting-IP');
   if (!ip)
     throw new RequestError(
       'Could not verify the network for this free trial.',
       403,
     );
-  const network = await digest(
-    secret,
-    'network:' + new Date().toISOString().slice(0, 10) + ':' + ip,
-  );
+  const day = new Date().toISOString().slice(0, 10);
+  const network = await sign('network:' + day + ':' + networkGroup(ip));
   return {
     visitor,
     network,
+    day,
+    existing,
     cookie: `__Host-voxbench_trial=${signed}; Path=/; Secure; HttpOnly; SameSite=Lax; Max-Age=31536000`,
   };
 }
@@ -95,24 +103,59 @@ export async function remainingTrials(db: D1Database, visitor: string) {
     .first<{ used: number }>();
   return Math.max(0, 3 - (row?.used || 0));
 }
+function quotaError() {
+  return new RequestError(
+    'The free-trial allowance for this browser, network or day has been used. Use your own keys to continue.',
+    429,
+  );
+}
+export async function checkTrialCapacity(
+  db: D1Database,
+  visitor: string,
+  network: string,
+  day: string,
+) {
+  const row = await db
+    .prepare(`SELECT
+    COALESCE((SELECT used FROM demo_counters WHERE scope='visitor' AND identifier=?),0) AS visitor,
+    COALESCE((SELECT used FROM demo_counters WHERE scope='network' AND identifier=?),0) AS network,
+    COALESCE((SELECT used FROM demo_counters WHERE scope='global' AND identifier=?),0) AS total`)
+    .bind(visitor, network, day)
+    .first<{ visitor: number; network: number; total: number }>();
+  if (
+    !row ||
+    row.visitor >= 3 ||
+    row.network >= 10 ||
+    row.total >= DEMO_DAILY_LIMIT
+  )
+    throw quotaError();
+}
 export async function claimTrial(
   db: D1Database,
   visitor: string,
   network: string,
+  day = new Date().toISOString().slice(0, 10),
 ) {
-  // One SQLite statement plus its trigger atomically checks and debits both limits.
+  // The INSERT and its trigger atomically check/debit all three limits.
   const result = await db
-    .prepare(`INSERT INTO demo_claims(id, visitor, network_day, created_at)
-    SELECT ?, ?, ?, ?
+    .prepare(`INSERT INTO demo_claims(id,visitor,network_day,created_at,global_day)
+    SELECT ?,?,?,?,?
     WHERE COALESCE((SELECT used FROM demo_counters WHERE scope='visitor' AND identifier=?),0) < 3
-      AND COALESCE((SELECT used FROM demo_counters WHERE scope='network' AND identifier=?),0) < 10 RETURNING id`)
-    .bind(crypto.randomUUID(), visitor, network, Date.now(), visitor, network)
+      AND COALESCE((SELECT used FROM demo_counters WHERE scope='network' AND identifier=?),0) < 10
+      AND COALESCE((SELECT used FROM demo_counters WHERE scope='global' AND identifier=?),0) < ? RETURNING id`)
+    .bind(
+      crypto.randomUUID(),
+      visitor,
+      network,
+      Date.now(),
+      day,
+      visitor,
+      network,
+      day,
+      DEMO_DAILY_LIMIT,
+    )
     .first<{ id: string }>();
-  if (!result)
-    throw new RequestError(
-      'The free-trial allowance for this browser or network has been used. Connect OpenRouter or add your own key to continue.',
-      429,
-    );
+  if (!result) throw quotaError();
 }
 export async function verifyHuman(
   token: string,

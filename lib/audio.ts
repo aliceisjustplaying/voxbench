@@ -1,5 +1,6 @@
 export const MAX_SECONDS = 60;
 export type Clip = {
+  source: 'recording' | 'upload';
   base64: string;
   url: string;
   duration: number;
@@ -7,7 +8,11 @@ export type Clip = {
   name: string;
   blob: Blob;
 };
-export async function prepareClip(source: Blob, name: string): Promise<Clip> {
+export async function prepareClip(
+  source: Blob,
+  name: string,
+  kind: Clip['source'] = 'upload',
+): Promise<Clip> {
   if (source.size > 25 * 1024 * 1024)
     throw new Error('Choose an audio file smaller than 25 MB.');
   const context = new AudioContext();
@@ -74,6 +79,7 @@ export async function prepareClip(source: Blob, name: string): Promise<Clip> {
     .map((x) => x.toString(16).padStart(2, '0'))
     .join('');
   return {
+    source: kind,
     base64: btoa(binary),
     blob,
     url: URL.createObjectURL(blob),

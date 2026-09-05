@@ -1,5 +1,6 @@
 import type { NextConfig } from 'next';
-
-const nextConfig: NextConfig = {};
-
+import { securityHeaders } from './lib/security-headers';
+const nextConfig: NextConfig = {
+  headers: () => [{ source: '/:path*', headers: securityHeaders }],
+};
 export default nextConfig;

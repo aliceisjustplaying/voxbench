@@ -1,5 +1,7 @@
 'use client';
+/* oxlint-disable react/set-state-in-effect -- Restore browser storage after hydration and synchronize externally changed credentials. */
 import Script from 'next/script';
+import { readApiResponse } from '@/lib/api-response';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Mic,
@@ -199,9 +201,18 @@ export default function Home() {
       stream.current?.getTracks().forEach((t) => t.stop());
       if (timer.current) clearInterval(timer.current);
       controllers.current.forEach((c) => c.abort());
-      urls.current.forEach(URL.revokeObjectURL);
+      urls.current.forEach((url) => URL.revokeObjectURL(url));
     };
   }, []);
+  useEffect(() => {
+    const retained = new Set(runs.map((run) => run.clip.url));
+    if (clip) retained.add(clip.url);
+    urls.current = urls.current.filter((url) => {
+      if (retained.has(url)) return true;
+      URL.revokeObjectURL(url);
+      return false;
+    });
+  }, [runs, clip]);
   const updateResult = useCallback(
     (runId: string, id: string, patch: Partial<Result>) =>
       setRuns((old) =>
@@ -233,11 +244,15 @@ export default function Home() {
       );
     }
   }
-  async function loadClip(blob: Blob, name: string) {
+  async function loadClip(
+    blob: Blob,
+    name: string,
+    source: Clip['source'] = 'upload',
+  ) {
     setPreparing(true);
     setError('');
     try {
-      const next = await prepareClip(blob, name);
+      const next = await prepareClip(blob, name, source);
       if (!mounted.current) {
         URL.revokeObjectURL(next.url);
         return;
@@ -295,6 +310,7 @@ export default function Home() {
           void loadClip(
             new Blob(chunks, { type: r.mimeType }),
             'Recorded take',
+            'recording',
           );
       };
       r.onerror = () => {
@@ -364,10 +380,12 @@ export default function Home() {
         }),
         signal: controller.signal,
       });
-      const data = (await response.json()) as TranscriptionOutput & {
-        error?: string;
-        diagnostics?: ProviderDiagnostics;
-      };
+      const data = await readApiResponse<
+        TranscriptionOutput & {
+          error?: string;
+          diagnostics?: ProviderDiagnostics;
+        }
+      >(response);
       if (!response.ok) {
         updateResult(run.id, id, {
           status: 'error',
@@ -413,12 +431,18 @@ export default function Home() {
       );
       return;
     }
+    if (mode === 'free' && clip.source !== 'recording') {
+      setError(
+        'The free trial uses microphone recordings only. Record a take or use your own keys to upload audio.',
+      );
+      return;
+    }
     const terms = useVocabulary ? parseVocabulary(vocabulary) : [];
     if (
       terms.length > 100 ||
       terms.some(
         (t) =>
-          t.length > 49 || t.split(/\s+/).length > 5 || /[<>{}\[\]\\]/.test(t),
+          t.length > 49 || t.split(/\s+/).length > 5 || /[<>{}[\]\\]/.test(t),
       )
     ) {
       setError(
@@ -440,7 +464,7 @@ export default function Home() {
         status: 'queued',
       })),
     };
-    setRuns((old) => [run, ...old]);
+    setRuns((old) => [run, ...old].slice(0, 20));
     setActiveId(run.id);
     busyRef.current = true;
     setBusy(true);
@@ -462,11 +486,11 @@ export default function Home() {
           }),
           signal: controller.signal,
         });
-        const data = (await response.json()) as {
+        const data = await readApiResponse<{
           results?: Result[];
           remaining?: number;
           error?: string;
-        };
+        }>(response);
         if (!response.ok || !data.results)
           throw new Error(
             data.error || 'The free comparison could not finish.',
@@ -650,7 +674,9 @@ export default function Home() {
       <section className="intro">
         <div>
           <h1>Find the model that gets you.</h1>
-          <p>One recording. Eleven models. Compare what they hear.</p>
+          <p>
+            One recording. Choose from eleven models. Compare what they hear.
+          </p>
         </div>
         <span className="bench-tag">
           11 contenders
@@ -684,7 +710,7 @@ export default function Home() {
               </span>
               <span>Voxbench pays</span>
               <small>
-                {demo.remaining ?? 0} comparisons left · 30-second clips
+                {demo.remaining ?? 0} comparisons left · 30-second recordings
                 <br />
                 GPT, Voxtral &amp; MAI
               </small>
@@ -761,30 +787,40 @@ export default function Home() {
                   ? 'Record another'
                   : 'Record a take'}
             </Button>
-            <Button
-              variant="outline"
-              onClick={() => upload.current?.click()}
-              disabled={preparing || recording || busy}
-            >
-              <Upload />
-              Upload
-            </Button>
-            <input
-              ref={upload}
-              type="file"
-              accept="audio/*,.wav,.mp3,.m4a,.webm,.ogg,.flac"
-              className="sr-only"
-              aria-label="Upload an audio recording"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) void loadClip(file, file.name);
-                e.target.value = '';
-              }}
-            />
+            {mode === 'own' && (
+              <>
+                <Button
+                  variant="outline"
+                  onClick={() => upload.current?.click()}
+                  disabled={preparing || recording || busy}
+                >
+                  <Upload />
+                  Upload
+                </Button>
+                <input
+                  ref={upload}
+                  type="file"
+                  accept="audio/*,.wav,.mp3,.m4a,.webm,.ogg,.flac"
+                  className="sr-only"
+                  aria-label="Upload an audio recording"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file && mode === 'own') void loadClip(file, file.name);
+                    e.target.value = '';
+                  }}
+                />
+              </>
+            )}
           </div>
           {clip && !recording ? (
             <div className="audio-preview">
-              <audio key={clip.url} controls src={clip.url} />
+              {/* oxlint-disable-next-line jsx-a11y/media-has-caption -- This is the user’s audio input; transcripts are generated below. */}
+              <audio
+                key={clip.url}
+                controls
+                src={clip.url}
+                aria-label="Your recording"
+              />
               <div>
                 <span>{clip.name}</span>
                 <button
@@ -817,8 +853,9 @@ export default function Home() {
             </summary>
             <div className="vocab-content">
               <div className="vocab-heading">
-                <label className="check-label">
+                <label className="check-label" htmlFor="use-vocabulary">
                   <Checkbox
+                    id="use-vocabulary"
                     checked={useVocabulary}
                     onCheckedChange={(v) => setUseVocabulary(!!v)}
                     disabled={busy}
@@ -864,8 +901,12 @@ export default function Home() {
                   }}
                 />
               </div>
-              <label className="check-label language">
+              <label
+                className="check-label language"
+                htmlFor="english-language"
+              >
                 <Checkbox
+                  id="english-language"
                   checked={english}
                   onCheckedChange={(v) => setEnglish(!!v)}
                   disabled={busy}
@@ -906,6 +947,7 @@ export default function Home() {
                   hasKey = !!keys[c]?.trim();
                 return (
                   <label
+                    htmlFor={'model-' + m.id}
                     className={
                       'model-choice ' +
                       (mode === 'free' || selected.includes(m.id)
@@ -915,6 +957,7 @@ export default function Home() {
                     key={m.id}
                   >
                     <Checkbox
+                      id={'model-' + m.id}
                       checked={mode === 'free' || selected.includes(m.id)}
                       onCheckedChange={(checked) =>
                         setSelected((old) =>
@@ -995,7 +1038,10 @@ export default function Home() {
                   preparing ||
                   recording ||
                   (mode === 'free'
-                    ? !demoToken || !demo.remaining
+                    ? !demoToken ||
+                      !demo.remaining ||
+                      clip.duration > 30 ||
+                      clip.source !== 'recording'
                     : !selected.length)
                 }
                 onClick={compare}
@@ -1010,6 +1056,18 @@ export default function Home() {
               </Button>
             )}
           </div>
+          {mode === 'free' && clip && clip.source !== 'recording' && (
+            <p role="alert">
+              Free trials use microphone recordings only. Record a take or
+              select your own keys to compare this upload.
+            </p>
+          )}
+          {mode === 'free' && clip && clip.duration > 30 && (
+            <p role="alert">
+              This clip is longer than the free trial’s 30-second limit. Record
+              a shorter take or use your own keys.
+            </p>
+          )}
           <p className="billing-note">
             {mode === 'free'
               ? 'Voxbench pays for this comparison. Each attempt uses one free trial, including provider failures. A shared-network limit also applies.'
@@ -1127,9 +1185,10 @@ export default function Home() {
               ))}
             </div>
             <p className="timing-note">
-              Timing includes whole-file upload and provider processing, not
-              live streaming latency. Up to three requests run together. A blank
-              cost means the provider did not report it.
+              The latest 20 comparisons stay in this tab. Export any you want to
+              keep. Timing includes whole-file upload and provider processing,
+              not live streaming latency. Up to three requests run together. A
+              blank cost means the provider did not report it.
             </p>
           </>
         ) : (
@@ -1144,6 +1203,7 @@ export default function Home() {
         )}
       </section>
       <footer>
+        <a href="/privacy">Privacy</a>
         <span>
           Keys and vocabulary are saved in this browser. Audio, keys and
           optional vocabulary pass through our server to selected providers;
@@ -1151,7 +1211,7 @@ export default function Home() {
           keys. Export results before closing.
         </span>
         <details>
-          <summary>Model sources · checked 5 Sep 2026</summary>
+          <summary>Model sources</summary>
           <div className="source-links">
             {models.map((m) => (
               <a key={m.id} href={m.docs} target="_blank" rel="noreferrer">

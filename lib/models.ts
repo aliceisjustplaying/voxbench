@@ -100,7 +100,7 @@ export const models: Model[] = [
     maker: 'NVIDIA',
     connection: 'openrouter',
     model: 'nvidia/nemotron-3.5-asr-streaming-multilingual-0.6b',
-    vocabulary: 'No hints sent in this spike',
+    vocabulary: 'No custom vocabulary support',
     docs: 'https://openrouter.ai/nvidia/nemotron-3.5-asr-streaming-multilingual-0.6b',
   },
   {
@@ -109,7 +109,7 @@ export const models: Model[] = [
     maker: 'Qwen',
     connection: 'openrouter',
     model: 'qwen/qwen3-asr-1.7b',
-    vocabulary: 'No hints sent in this spike',
+    vocabulary: 'No custom vocabulary support',
     docs: 'https://openrouter.ai/qwen/qwen3-asr-1.7b',
   },
   {
@@ -118,7 +118,7 @@ export const models: Model[] = [
     maker: 'NVIDIA',
     connection: 'openrouter',
     model: 'nvidia/parakeet-tdt-0.6b-v3',
-    vocabulary: 'No hints sent in this spike',
+    vocabulary: 'No custom vocabulary support',
     docs: 'https://openrouter.ai/nvidia/parakeet-tdt-0.6b-v3',
   },
 ];

@@ -1,4 +1,3 @@
-import { sites } from '@openai/sites-vite-plugin';
 import tailwindcss from '@tailwindcss/postcss';
 import vinext from 'vinext';
 import { defineConfig } from 'vite';
@@ -20,7 +19,7 @@ const localBindingConfig = {
       simple: { limit: 120, period: 60 as const },
     },
   ],
-  compatibility_flags: ['nodejs_compat'],
+  compatibility_flags: ['nodejs_compat', 'enable_request_signal'],
   d1_databases: [
     {
       binding: 'DEMO_DB',
@@ -47,7 +46,6 @@ export default defineConfig(async () => {
       : undefined,
     plugins: [
       vinext(),
-      sites(),
       cloudflare({
         viteEnvironment: { name: 'rsc', childEnvironments: ['ssr'] },
         config: localBindingConfig,

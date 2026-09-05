@@ -1259,3 +1259,24 @@ summary:focus-visible {
   font-size: 13px;
   font-weight: 600;
 }
+
+.privacy-page {
+  max-width: 840px;
+  padding-top: 32px;
+  padding-bottom: 48px;
+}
+.privacy-page h1 {
+  margin: 24px 0;
+  font-size: 36px;
+}
+.privacy-page h2 {
+  margin: 28px 0 10px;
+  font-size: 22px;
+}
+.privacy-page p {
+  margin: 12px 0;
+}
+.privacy-page a {
+  color: var(--primary);
+  text-decoration: underline;
+}

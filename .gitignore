@@ -38,3 +38,8 @@ next-env.d.ts
 /work/
 
 *.tsbuildinfo
+
+# Worker local secrets
+.dev.vars*
+# Local review and verification notes
+REVIEW.md
