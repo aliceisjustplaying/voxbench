@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 const description =
-  'Record a take and read 11 speech-to-text transcripts side by side. Try three free, or log in with OpenRouter for all eleven.';
+  'Record a take and read 11 speech-to-text transcripts side by side. Free trial, bring your own keys, or log in with OpenRouter.';
 export const metadata: Metadata = {
   metadataBase: new URL('https://voxbench.app'),
   title: 'Voxbench — which speech-to-text model hears you best?',
@@ -31,7 +31,7 @@ export const metadata: Metadata = {
         url: '/og.png',
         width: 1200,
         height: 630,
-        alt: 'Voxbench: which speech-to-text model hears you best? Eleven models, three free to try, log in with OpenRouter for all.',
+        alt: 'Voxbench: which speech-to-text model hears you best? Eleven models. Free trial, bring your own keys, or log in with OpenRouter.',
       },
     ],
   },

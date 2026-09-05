@@ -674,8 +674,8 @@ export default function Home() {
         <div>
           <h1>Which speech-to-text model hears you best?</h1>
           <p>
-            Record a take and read 11 transcripts side by side. Try three free,
-            run all eleven with your own keys.
+            Record a take and read 11 transcripts side by side. Free trial, your
+            own keys, or log in with OpenRouter.
           </p>
         </div>
       </section>
