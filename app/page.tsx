@@ -5,6 +5,7 @@ import { readApiResponse } from '@/lib/api-response';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import {
+  ArrowDown,
   Mic,
   AudioLines,
   Upload,
@@ -60,6 +61,7 @@ type Run = {
   terms: string[];
   english: boolean;
   reference: string;
+  referenceModelId?: string;
   results: Result[];
   sponsored?: boolean;
 };
@@ -234,10 +236,12 @@ export default function Home() {
     [activeId, setActiveId] = useState(''),
     [busy, setBusy] = useState(false),
     [view, setView] = useState('raw'),
-    [sortByRank, setSortByRank] = useState(false),
     [error, setError] = useState('');
   const recorder = useRef<MediaRecorder | null>(null),
     stream = useRef<MediaStream | null>(null),
+    capturePending = useRef(false),
+    recordingStarted = useRef(0),
+    recordedSeconds = useRef<number | undefined>(undefined),
     timer = useRef<ReturnType<typeof setInterval> | null>(null),
     controllers = useRef<AbortController[]>([]),
     cancelled = useRef(false),
@@ -261,6 +265,7 @@ export default function Home() {
           : rankTranscripts(
               active.results.map((r) => ({ id: r.id, text: r.output?.text })),
               active.reference,
+              active.referenceModelId,
             ),
     [active],
   );
@@ -272,10 +277,12 @@ export default function Home() {
       doc.startViewTransition(() => flushSync(update));
     else update();
   }
-  function setRunReference(text: string) {
+  function setRunReference(text: string, referenceModelId?: string) {
     if (active)
       setRuns((old) =>
-        old.map((r) => (r.id === active.id ? { ...r, reference: text } : r)),
+        old.map((r) =>
+          r.id === active.id ? { ...r, reference: text, referenceModelId } : r,
+        ),
       );
     else setReference(text);
   }
@@ -340,11 +347,12 @@ export default function Home() {
     blob: Blob,
     name: string,
     source: Clip['source'] = 'upload',
+    expectedSeconds?: number,
   ) {
     setPreparing(true);
     setError('');
     try {
-      const next = await prepareClip(blob, name, source);
+      const next = await prepareClip(blob, name, source, expectedSeconds);
       if (!mounted.current) {
         URL.revokeObjectURL(next.url);
         return;
@@ -362,14 +370,23 @@ export default function Home() {
   }
   function stopRecording() {
     if (timer.current) clearInterval(timer.current);
-    if (recorder.current?.state === 'recording') recorder.current.stop();
-    stream.current?.getTracks().forEach((t) => t.stop());
+    timer.current = null;
+    if (recorder.current?.state === 'recording') {
+      recordedSeconds.current =
+        (performance.now() - recordingStarted.current) / 1000;
+      setPreparing(true);
+      recorder.current.stop();
+    }
+    // Release the microphone in onstop, after the final audio data arrives.
     setRecording(false);
   }
   async function startRecording() {
-    if (preparing || recording || busyRef.current) return;
+    if (capturePending.current || preparing || recording || busyRef.current)
+      return;
+    capturePending.current = true;
     setError('');
     setPreparing(true);
+    setClip(null);
     try {
       if (
         !navigator.mediaDevices?.getUserMedia ||
@@ -390,8 +407,6 @@ export default function Home() {
       }
       const track = s.getAudioTracks()[0];
       setInputLabel(track?.label || '');
-      if (!inputId && track?.getSettings().deviceId)
-        setInputId(track.getSettings().deviceId!);
       void refreshInputs();
       const mime = ['audio/webm;codecs=opus', 'audio/mp4', 'audio/webm'].find(
         (m) => MediaRecorder.isTypeSupported(m),
@@ -402,31 +417,55 @@ export default function Home() {
       r.ondataavailable = (e) => {
         if (e.data.size) chunks.push(e.data);
       };
+      let failed = false;
       r.onstop = () => {
         s.getTracks().forEach((t) => t.stop());
-        if (mounted.current)
-          void loadClip(
-            new Blob(chunks, { type: r.mimeType }),
-            'Recorded take',
-            'recording',
+        if (recorder.current !== r || !mounted.current) return;
+        if (timer.current) clearInterval(timer.current);
+        timer.current = null;
+        recorder.current = null;
+        stream.current = null;
+        setRecording(false);
+        if (failed) {
+          capturePending.current = false;
+          setPreparing(false);
+          setError(
+            'The microphone stopped unexpectedly. Please try another take.',
           );
+          return;
+        }
+        const seconds =
+          recordedSeconds.current ??
+          (performance.now() - recordingStarted.current) / 1000;
+        void loadClip(
+          new Blob(chunks, { type: r.mimeType }),
+          'Recorded take',
+          'recording',
+          seconds,
+        ).finally(() => {
+          capturePending.current = false;
+        });
       };
       r.onerror = () => {
+        if (recorder.current !== r) return;
+        failed = true;
         stopRecording();
-        setError(
-          'The microphone stopped unexpectedly. Please try another take.',
-        );
       };
-      r.start(200);
+      // Each short take is one complete file, rather than fragmented MP4 chunks.
+      recordedSeconds.current = undefined;
+      recordingStarted.current = performance.now();
+      r.start();
       setElapsed(0);
       setRecording(true);
-      const began = Date.now();
+      const began = recordingStarted.current;
       timer.current = setInterval(() => {
-        const sec = (Date.now() - began) / 1000;
+        if (recorder.current !== r) return;
+        const sec = (performance.now() - began) / 1000;
         setElapsed(sec);
         if (sec >= (mode === 'free' ? 29.5 : MAX_SECONDS)) stopRecording();
       }, 100);
     } catch (e) {
+      capturePending.current = false;
       stream.current?.getTracks().forEach((t) => t.stop());
       setError(
         e instanceof Error && e.name === 'NotAllowedError'
@@ -465,7 +504,6 @@ export default function Home() {
       error: undefined,
       diagnostics: undefined,
       output: undefined,
-      note: undefined,
     });
     try {
       const input = {
@@ -766,7 +804,11 @@ export default function Home() {
           throw new Error('Expected text under 10000 characters.');
         if (active)
           setRuns((old) =>
-            old.map((r) => (r.id === active.id ? { ...r, reference: t } : r)),
+            old.map((r) =>
+              r.id === active.id
+                ? { ...r, reference: t, referenceModelId: undefined }
+                : r,
+            ),
           );
         else setReference(t);
         return { reference: t };
@@ -891,6 +933,7 @@ export default function Home() {
                   disabled={recording || preparing || busy}
                   onChange={(e) => setInputId(e.target.value)}
                 >
+                  <option value="">Default microphone</option>
                   {inputs.map((d) => (
                     <option key={d.deviceId} value={d.deviceId}>
                       {d.label}
@@ -1032,165 +1075,198 @@ export default function Home() {
             </details>
           </div>
           <div className="lineup">
-            <div className="lineup-title">
-              <button
-                className="text-button"
-                disabled={busy || mode === 'free'}
-                onClick={() =>
-                  chooseModels(
-                    ready === available.length && ready > 0
-                      ? []
-                      : models.map((m) => m.id),
-                  )
-                }
-              >
-                {mode === 'free'
-                  ? 'Free trial: 3 models'
-                  : ready === available.length && ready > 0
-                    ? 'Deselect all'
-                    : 'Select all'}
-              </button>
-            </div>
-            <div className="model-grid">
-              {models
-                .filter((m) => mode === 'own' || FREE_MODELS.includes(m.id))
-                .map((m) => {
-                  const c =
-                      mode === 'free' ? m.connection : connectionFor(m, keys),
-                    hasKey = !!keys[c]?.trim();
-                  return (
-                    <label
-                      htmlFor={'model-' + m.id}
-                      className={
-                        'model-choice ' +
-                        (mode === 'free' || (hasKey && selected.includes(m.id))
-                          ? 'chosen'
-                          : '')
-                      }
-                      key={m.id}
-                    >
-                      {mode === 'own' && (
-                        <Checkbox
-                          id={'model-' + m.id}
-                          checked={hasKey && selected.includes(m.id)}
-                          onCheckedChange={(checked) =>
-                            chooseModels(
-                              checked
-                                ? [...selected, m.id]
-                                : selected.filter((id) => id !== m.id),
-                            )
-                          }
-                          disabled={busy || !hasKey}
-                        />
-                      )}
-                      <span className="model-details">
-                        <strong>{m.name}</strong>
-                        <span className="model-meta">
-                          {m.maker} ·{' '}
-                          {c === 'openrouter' ? 'via OpenRouter' : 'direct'}
-                        </span>
-                        <small
-                          className={
-                            mode === 'own' &&
-                            c === 'openrouter' &&
-                            (m.id === 'gpt' || m.id === 'voxtral')
-                              ? 'vocabulary-warning'
-                              : undefined
-                          }
-                        >
-                          {mode === 'free' &&
-                          (m.id === 'gpt' || m.id === 'voxtral')
-                            ? 'Vocabulary unsupported via OpenRouter'
-                            : m.id === 'gpt'
-                              ? c === 'openai'
-                                ? 'Custom vocabulary via your OpenAI key'
-                                : 'Add an OpenAI key for vocabulary'
-                              : m.vocabulary}
-                        </small>
-                      </span>
-                      {mode === 'free' ? (
-                        <span className="key-status">Included</span>
-                      ) : hasKey ? (
-                        <span className="key-dot present" title="Key added" />
-                      ) : (
-                        <button
-                          type="button"
-                          className="key-status text-button"
-                          disabled={busy}
-                          onClick={() => setKeysOpen(true)}
-                        >
-                          Add key
-                        </button>
-                      )}
-                    </label>
-                  );
-                })}
-            </div>
-            {mode === 'free' && demo.siteKey && !!demo.remaining && (
-              <DemoCheck
-                siteKey={demo.siteKey}
-                reset={demoReset}
-                onToken={setDemoToken}
-              />
-            )}
-            <div className="compare-bar">
-              <div>
-                <strong>
-                  {mode === 'free' ? '3 models included' : `${ready} selected`}
-                </strong>
-                <span>
-                  {mode === 'free'
-                    ? `${demo.remaining ?? 0} free comparisons left`
-                    : `${available.length} of ${models.length} available`}
-                </span>
+            <div className="compare-controls">
+              {mode === 'free' && demo.siteKey && !!demo.remaining && (
+                <DemoCheck
+                  siteKey={demo.siteKey}
+                  reset={demoReset}
+                  onToken={setDemoToken}
+                />
+              )}
+              <div className="compare-bar">
+                <div>
+                  <strong>
+                    {mode === 'free'
+                      ? '3 models included'
+                      : `${ready} selected`}
+                  </strong>
+                  <span>
+                    {mode === 'free'
+                      ? `${demo.remaining ?? 0} free comparisons left`
+                      : `${available.length} of ${models.length} available`}
+                  </span>
+                </div>
+                {busy ? (
+                  <Button variant="outline" onClick={cancel}>
+                    <X />
+                    Stop
+                  </Button>
+                ) : (
+                  <Button
+                    disabled={
+                      preparing ||
+                      recording ||
+                      (mode === 'free'
+                        ? !clip ||
+                          !demoToken ||
+                          !demo.remaining ||
+                          clip.duration > 30 ||
+                          clip.source !== 'recording'
+                        : ready > 0 && !clip)
+                    }
+                    onClick={compare}
+                  >
+                    <Play />
+                    {mode === 'free'
+                      ? 'Compare for free'
+                      : ready
+                        ? `Compare ${ready} ${ready === 1 ? 'model' : 'models'}`
+                        : 'Add keys to compare'}
+                  </Button>
+                )}
               </div>
-              {busy ? (
-                <Button variant="outline" onClick={cancel}>
-                  <X />
-                  Stop
-                </Button>
-              ) : (
-                <Button
-                  disabled={
-                    preparing ||
-                    recording ||
-                    (mode === 'free'
-                      ? !clip ||
-                        !demoToken ||
-                        !demo.remaining ||
-                        clip.duration > 30 ||
-                        clip.source !== 'recording'
-                      : ready > 0 && !clip)
-                  }
-                  onClick={compare}
-                >
-                  <Play />
-                  {mode === 'free'
-                    ? 'Compare for free'
-                    : ready
-                      ? `Compare ${ready} ${ready === 1 ? 'model' : 'models'}`
-                      : 'Add keys to compare'}
-                </Button>
+              {active && (
+                <div className="results-cue">
+                  <span role="status">
+                    {busy
+                      ? 'Transcripts are appearing below.'
+                      : `${active.results.filter((r) => r.status === 'done').length} of ${active.results.length} transcripts ready.`}
+                  </span>
+                  <a href="#results">
+                    View results below{' '}
+                    <ArrowDown size={16} aria-hidden="true" />
+                  </a>
+                </div>
+              )}
+              {mode === 'free' && clip && clip.source !== 'recording' && (
+                <p role="alert">
+                  The free trial uses microphone recordings. Record a take, or
+                  compare this file with your own keys.
+                </p>
+              )}
+              {mode === 'free' && clip && clip.duration > 30 && (
+                <p role="alert">
+                  Free trial takes are up to 30 seconds. Record a shorter one,
+                  or use your own keys.
+                </p>
+              )}
+              {mode === 'free' && (
+                <p className="billing-note">
+                  Each attempt uses one free comparison, including failed ones.
+                  Limits apply per browser and network.
+                </p>
               )}
             </div>
-            {mode === 'free' && clip && clip.source !== 'recording' && (
-              <p role="alert">
-                The free trial uses microphone recordings. Record a take, or
-                compare this file with your own keys.
-              </p>
-            )}
-            {mode === 'free' && clip && clip.duration > 30 && (
-              <p role="alert">
-                Free trial takes are up to 30 seconds. Record a shorter one, or
-                use your own keys.
-              </p>
-            )}
-            {mode === 'free' && (
-              <p className="billing-note">
-                Each attempt uses one free comparison, including failed ones.
-                Limits apply per browser and network.
-              </p>
-            )}
+            <div>
+              <div className="lineup-title">
+                <button
+                  className="text-button"
+                  disabled={busy || mode === 'free'}
+                  onClick={() =>
+                    chooseModels(
+                      ready === available.length && ready > 0
+                        ? []
+                        : models.map((m) => m.id),
+                    )
+                  }
+                >
+                  {mode === 'free'
+                    ? 'Free trial: 3 models'
+                    : ready === available.length && ready > 0
+                      ? 'Deselect all'
+                      : 'Select all'}
+                </button>
+              </div>
+              <div className="model-grid">
+                {models
+                  .filter((m) => mode === 'own' || FREE_MODELS.includes(m.id))
+                  .map((m) => {
+                    const c =
+                        mode === 'free' ? m.connection : connectionFor(m, keys),
+                      hasKey = !!keys[c]?.trim();
+                    return (
+                      <label
+                        htmlFor={'model-' + m.id}
+                        className={
+                          'model-choice ' +
+                          (mode === 'free' ||
+                          (hasKey && selected.includes(m.id))
+                            ? 'chosen'
+                            : '')
+                        }
+                        key={m.id}
+                      >
+                        {mode === 'own' && (
+                          <Checkbox
+                            id={'model-' + m.id}
+                            checked={hasKey && selected.includes(m.id)}
+                            onCheckedChange={(checked) =>
+                              chooseModels(
+                                checked
+                                  ? [...selected, m.id]
+                                  : selected.filter((id) => id !== m.id),
+                              )
+                            }
+                            disabled={busy || !hasKey}
+                          />
+                        )}
+                        <span className="model-details">
+                          <strong>{m.name}</strong>
+                          <span className="model-mobile-meta">
+                            {c === 'openrouter' ? 'OpenRouter' : m.maker}
+                            {' · '}
+                            {m.id === 'scribe'
+                              ? 'Hints cost extra'
+                              : ['nemotron', 'parakeet', 'voxtral'].includes(
+                                    m.id,
+                                  ) ||
+                                  (c === 'openrouter' &&
+                                    ['gpt', 'nova'].includes(m.id))
+                                ? 'No vocabulary hints'
+                                : 'Vocabulary hints'}
+                          </span>
+                          <span className="model-meta">
+                            {m.maker} ·{' '}
+                            {c === 'openrouter' ? 'via OpenRouter' : 'direct'}
+                          </span>
+                          <small
+                            className={
+                              mode === 'own' &&
+                              c === 'openrouter' &&
+                              (m.id === 'gpt' || m.id === 'voxtral')
+                                ? 'model-vocabulary vocabulary-warning'
+                                : 'model-vocabulary'
+                            }
+                          >
+                            {mode === 'free' &&
+                            (m.id === 'gpt' || m.id === 'voxtral')
+                              ? 'Vocabulary unsupported via OpenRouter'
+                              : m.id === 'gpt'
+                                ? c === 'openai'
+                                  ? 'Custom vocabulary via your OpenAI key'
+                                  : 'Add an OpenAI key for vocabulary'
+                                : m.vocabulary}
+                          </small>
+                        </span>
+                        {mode === 'free' ? (
+                          <span className="key-status">Included</span>
+                        ) : hasKey ? (
+                          <span className="key-dot present" title="Key added" />
+                        ) : (
+                          <button
+                            type="button"
+                            className="key-status text-button"
+                            disabled={busy}
+                            onClick={() => setKeysOpen(true)}
+                          >
+                            Add key
+                          </button>
+                        )}
+                      </label>
+                    );
+                  })}
+              </div>
+            </div>
           </div>
         </section>
       </div>
@@ -1199,7 +1275,12 @@ export default function Home() {
           {error}
         </p>
       ) : null}
-      <section className="results">
+      <section
+        className="results"
+        id="results"
+        tabIndex={-1}
+        aria-label="Transcripts"
+      >
         <div className="results-heading">
           <div>
             <h2 className="section-label">Transcripts</h2>
@@ -1212,15 +1293,6 @@ export default function Home() {
                   <TabsTrigger value="lowercase">Lowercase</TabsTrigger>
                 </TabsList>
               </Tabs>
-              <Button
-                variant="outline"
-                size="sm"
-                aria-pressed={sortByRank}
-                disabled={!ranking?.basis}
-                onClick={() => withTransition(() => setSortByRank((v) => !v))}
-              >
-                {sortByRank ? 'Original order' : 'Sort by rank'}
-              </Button>
               <Button variant="outline" size="sm" onClick={exportRun}>
                 <Download />
                 Export JSON
@@ -1246,9 +1318,9 @@ export default function Home() {
             ))}
           </div>
         ) : null}
-        <details className="reference" open={!!active}>
+        <details className="reference">
           <summary>
-            Reference <span>What you actually said</span>
+            Reference transcript <span>Optional · measure word errors</span>
           </summary>
           <textarea
             aria-label="Reference transcript"
@@ -1256,7 +1328,7 @@ export default function Home() {
             rows={3}
             value={active ? active.reference : reference}
             onChange={(e) => setRunReference(e.target.value)}
-            placeholder="Mark the closest match below, then fix any wrong words here. Stays in your browser."
+            placeholder="Use a transcript below as a reference, then correct it to match what you said."
           />
           <p>
             Word errors count substituted, missing, and extra words, ignoring
@@ -1285,36 +1357,12 @@ export default function Home() {
               </span>
             </div>
             {ranking?.basis && (
-              <section className="leaderboard" aria-label="Ranking">
-                <p>
-                  {ranking.basis === 'reference'
-                    ? 'Ranked by word errors against your reference.'
-                    : 'Ranked by agreement with the other models. Mark the closest match on a card to rank by accuracy instead.'}
-                </p>
-                <ol>
-                  {ranking.order
-                    .filter((id) => ranking.rank[id])
-                    .map((id) => {
-                      const m = models.find((x) => x.id === id)!;
-                      return (
-                        <li key={id}>
-                          <a href={'#result-' + active.id + '-' + id}>
-                            <b>{ranking.rank[id]}</b>
-                            <span>{m.name}</span>
-                            <small>
-                              {ranking.basis === 'reference'
-                                ? `${(ranking.score[id] * 100).toFixed(1)}% word errors`
-                                : `${Math.round((1 - ranking.score[id]) * 100)}% agreement`}
-                            </small>
-                          </a>
-                        </li>
-                      );
-                    })}
-                </ol>
-              </section>
+              <p className="ranking-note">
+                Sorted by fewest word errors compared to your reference
+              </p>
             )}
             <div className="result-grid">
-              {(sortByRank && ranking?.basis
+              {(ranking?.basis
                 ? ranking.order.map((id) =>
                     active.results.find((r) => r.id === id)!,
                   )
@@ -1330,15 +1378,16 @@ export default function Home() {
                       ? { basis: ranking.basis, value: ranking.score[r.id] }
                       : undefined
                   }
-                  isReference={!!r.output && r.output.text === active.reference}
+                  isReference={r.id === active.referenceModelId}
                   reference={active.reference}
                   terms={active.terms}
                   lowercase={view === 'lowercase'}
                   busy={busy}
                   onRetry={() => retry(active, r.id)}
-                  onChange={(patch) => updateResult(active.id, r.id, patch)}
                   onUseAsReference={() =>
-                    withTransition(() => setRunReference(r.output?.text ?? ''))
+                    withTransition(() =>
+                      setRunReference(r.output?.text ?? '', r.id),
+                    )
                   }
                 />
               ))}

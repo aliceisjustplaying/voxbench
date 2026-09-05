@@ -12,10 +12,12 @@ export async function prepareClip(
   source: Blob,
   name: string,
   kind: Clip['source'] = 'upload',
+  expectedSeconds?: number,
 ): Promise<Clip> {
   if (source.size > 25 * 1024 * 1024)
     throw new Error('Choose an audio file smaller than 25 MB.');
-  const context = new AudioContext();
+  // Decoding must not open/close the device's live audio session between takes.
+  const context = new OfflineAudioContext(1, 1, 16000);
   let decoded: AudioBuffer;
   try {
     decoded = await context.decodeAudioData(await source.arrayBuffer());
@@ -23,9 +25,9 @@ export async function prepareClip(
     throw new Error(
       'This browser could not read that audio. Try a WAV, MP3, M4A or WebM file.',
     );
-  } finally {
-    await context.close();
   }
+  if (kind === 'recording' && expectedSeconds !== undefined)
+    validateRecordedDuration(decoded.duration, expectedSeconds);
   if (decoded.duration > MAX_SECONDS + 0.25)
     throw new Error(
       'Please use a clip of 60 seconds or less. Short takes make comparisons easier.',
@@ -95,4 +97,12 @@ export function downloadBlob(blob: Blob, name: string) {
   a.download = name;
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+/** Allow encoder padding/timing jitter, but never accept a substantially cut-off take. */
+export function validateRecordedDuration(actual: number, expected: number) {
+  if (expected >= 2 && actual < expected - Math.max(0.75, expected * 0.2))
+    throw new Error(
+      `Only ${actual.toFixed(1)}s of your ${expected.toFixed(1)}s recording was captured. Please record another take.`,
+    );
 }

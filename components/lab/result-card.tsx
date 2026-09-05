@@ -14,7 +14,6 @@ export type Result = {
   output?: TranscriptionOutput;
   error?: string;
   diagnostics?: ProviderDiagnostics;
-  note?: string;
 };
 export function ResultCard({
   result,
@@ -27,20 +26,18 @@ export function ResultCard({
   lowercase,
   busy,
   onRetry,
-  onChange,
   onUseAsReference,
 }: {
   result: Result;
   rank?: number;
   anchor: string;
-  score?: { basis: 'reference' | 'consensus'; value: number };
+  score?: { basis: 'reference'; value: number };
   isReference: boolean;
   reference: string;
   terms: string[];
   lowercase: boolean;
   busy: boolean;
   onRetry: () => void;
-  onChange: (patch: Partial<Result>) => void;
   onUseAsReference: () => void;
 }) {
   const m = models.find((x) => x.id === result.id)!;
@@ -103,14 +100,8 @@ export function ResultCard({
               {(result.output.elapsedMs / 1000).toFixed(1)}s <small>time</small>
             </span>
             <span>
-              {ranked?.basis === 'reference'
-                ? `${(ranked.value * 100).toFixed(1)}%`
-                : ranked
-                  ? `${Math.round((1 - ranked.value) * 100)}%`
-                  : '—'}{' '}
-              <small>
-                {ranked?.basis === 'consensus' ? 'agreement' : 'word errors'}
-              </small>
+              {ranked ? `${(ranked.value * 100).toFixed(1)}%` : '—'}{' '}
+              <small>word errors</small>
             </span>
             <span>
               {result.output.cost !== null
@@ -134,7 +125,7 @@ export function ResultCard({
               onClick={onUseAsReference}
             >
               <Star fill={isReference ? 'currentColor' : 'none'} />
-              {isReference ? 'Marked closest' : 'Closest match'}
+              {isReference ? 'Used as reference' : 'Use as reference'}
             </Button>
           </div>
           {copyError ? (
@@ -190,16 +181,6 @@ export function ResultCard({
               <pre>{JSON.stringify(result.output.settings, null, 2)}</pre>
             </div>
           </details>
-          <label className="note-label">
-            Your notes
-            <textarea
-              value={result.note || ''}
-              maxLength={2000}
-              onChange={(e) => onChange({ note: e.target.value })}
-              placeholder="Names it missed, phrasing it changed…"
-              rows={2}
-            />
-          </label>
         </>
       ) : (
         <div className="result-placeholder">

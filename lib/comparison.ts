@@ -112,52 +112,43 @@ export function importVocabulary(contents: string): string[] {
     .filter(Boolean);
 }
 export type Ranking = {
-  basis: 'reference' | 'consensus' | null;
+  basis: 'reference' | null;
   rank: Record<string, number>;
-  /** Word error rate against the reference, or mean distance to the other transcripts. */
+  /** Word error rate against the reference. */
   score: Record<string, number>;
   order: string[];
 };
 /**
- * Rank transcripts by word errors against the reference, or, without one,
- * by how closely each agrees with the other transcripts (consensus).
+ * Rank transcripts by word errors only when a reference is supplied.
  * Items without text keep their original order after ranked ones.
  */
 export function rankTranscripts(
   items: { id: string; text?: string }[],
   reference: string,
+  referenceModelId?: string,
 ): Ranking {
   const scored = items.filter(
     (x): x is { id: string; text: string } => typeof x.text === 'string',
   );
   const useReference = words(reference).length > 0;
-  if (scored.length < (useReference ? 1 : 2))
+  if (!useReference || !scored.length)
     return { basis: null, rank: {}, score: {}, order: items.map((x) => x.id) };
   const distance = (a: string, b: string) => compareWords(a, b)?.rate ?? 1;
-  const score = new Map(
-    scored.map((x) => [
-      x.id,
-      useReference
-        ? distance(reference, x.text)
-        : scored
-            .filter((o) => o.id !== x.id)
-            .reduce(
-              (sum, o) =>
-                sum + (distance(o.text, x.text) + distance(x.text, o.text)) / 2,
-              0,
-            ) /
-          (scored.length - 1),
-    ]),
-  );
+  const score = new Map(scored.map((x) => [x.id, distance(reference, x.text)]));
   const ranked = [...scored].sort(
-    (a, b) => score.get(a.id)! - score.get(b.id)!,
+    (a, b) =>
+      score.get(a.id)! - score.get(b.id)! ||
+      Number(b.id === referenceModelId) - Number(a.id === referenceModelId),
   );
   const rank: Record<string, number> = {};
   ranked.forEach((x, i) => {
-    rank[x.id] = i + 1;
+    rank[x.id] =
+      i > 0 && score.get(x.id) === score.get(ranked[i - 1].id)
+        ? rank[ranked[i - 1].id]
+        : i + 1;
   });
   return {
-    basis: useReference ? 'reference' : 'consensus',
+    basis: 'reference',
     rank,
     score: Object.fromEntries(score),
     order: [
