@@ -4,12 +4,16 @@ import { Check, Copy, Loader2, RotateCcw, Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { models } from '@/lib/models';
 import { compareWords, vocabularyHits } from '@/lib/comparison';
-import type { TranscriptionOutput } from '@/lib/transcription';
+import type {
+  TranscriptionOutput,
+  ProviderDiagnostics,
+} from '@/lib/transcription';
 export type Result = {
   id: string;
   status: 'queued' | 'running' | 'done' | 'error' | 'skipped' | 'cancelled';
   output?: TranscriptionOutput;
   error?: string;
+  diagnostics?: ProviderDiagnostics;
   note?: string;
   preferred?: boolean;
 };
@@ -184,6 +188,38 @@ export function ResultCard({
             : result.status === 'running'
               ? 'Listening to the same take…'
               : result.error || 'This request was stopped.'}
+          {result.diagnostics && (
+            <details className="provider-diagnostics">
+              <summary>Provider response details</summary>
+              <p>
+                Response body and selected headers, with credentials redacted.
+                {result.diagnostics.truncated
+                  ? ' Long response truncated.'
+                  : ''}
+              </p>
+              <pre>{JSON.stringify(result.diagnostics, null, 2)}</pre>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(
+                      JSON.stringify(result.diagnostics, null, 2),
+                    );
+                    setCopied(true);
+                    setCopyError('');
+                  } catch {
+                    setCopyError(
+                      'Select the details above and copy them manually.',
+                    );
+                  }
+                }}
+              >
+                {copied ? 'Copied' : 'Copy error details'}
+              </Button>
+              {copyError && <p role="status">{copyError}</p>}
+            </details>
+          )}
           {['error', 'skipped', 'cancelled'].includes(result.status) ? (
             <Button
               variant="outline"

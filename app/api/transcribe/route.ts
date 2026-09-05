@@ -51,14 +51,18 @@ export async function POST(request: Request) {
   } catch (error) {
     if (error instanceof RequestError)
       return Response.json(
-        { error: error.message },
+        { error: error.message, diagnostics: error.diagnostics },
         { status: error.status, headers },
       );
     console.error('Transcription request failed', {
       name: error instanceof Error ? error.name : 'UnknownError',
-      message: error instanceof Error
-        ? (apiKey ? error.message.replaceAll(apiKey, '[redacted]') : error.message).slice(0, 300)
-        : 'Unknown failure',
+      message:
+        error instanceof Error
+          ? (apiKey
+              ? error.message.replaceAll(apiKey, '[redacted]')
+              : error.message
+            ).slice(0, 300)
+          : 'Unknown failure',
     });
     const timedOut =
       error instanceof Error &&

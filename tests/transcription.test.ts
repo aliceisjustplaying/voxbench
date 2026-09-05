@@ -269,3 +269,55 @@ test('shows nested OpenRouter provider errors and redacts keys', async () => {
     },
   );
 });
+
+test('503 diagnostics preserve provider codes and request IDs while redacting credentials', async () => {
+  await assert.rejects(
+    () =>
+      transcribe(base, new AbortController().signal, async () =>
+        Response.json(
+          {
+            error: {
+              message: 'Backend unavailable',
+              code: 'backend_unavailable',
+              trace_id: 'trace-123',
+            },
+            api_key: base.key,
+            audio: base.audio,
+          },
+          {
+            status: 503,
+            headers: {
+              'x-fb-request-id': 'request-123',
+              'retry-after': '60',
+              'set-cookie': 'private',
+            },
+          },
+        ),
+      ),
+    (error) => {
+      const d = (error as any).diagnostics;
+      assert.equal(d.status, 503);
+      assert.equal(d.headers['x-fb-request-id'], 'request-123');
+      assert.equal(d.headers['retry-after'], '60');
+      assert.equal(d.headers['set-cookie'], undefined);
+      assert.match(d.response, /backend_unavailable/);
+      assert.doesNotMatch(JSON.stringify(d), /test-key-not-real/);
+      assert.ok(!d.response.includes(base.audio));
+      return true;
+    },
+  );
+});
+test('non-JSON provider failures retain readable diagnostic details', async () => {
+  await assert.rejects(
+    () =>
+      transcribe(
+        base,
+        new AbortController().signal,
+        async () => new Response('backend unavailable', { status: 503 }),
+      ),
+    (error) => {
+      assert.equal((error as any).diagnostics.response, 'backend unavailable');
+      return true;
+    },
+  );
+});

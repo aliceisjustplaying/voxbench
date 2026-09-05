@@ -21,7 +21,10 @@ import { ResultCard, type Result } from '@/components/lab/result-card';
 import { models, connectionFor, type Keys } from '@/lib/models';
 import { importVocabulary, parseVocabulary } from '@/lib/comparison';
 import { prepareClip, downloadBlob, MAX_SECONDS, type Clip } from '@/lib/audio';
-import type { TranscriptionOutput } from '@/lib/transcription';
+import type {
+  TranscriptionOutput,
+  ProviderDiagnostics,
+} from '@/lib/transcription';
 
 type Run = {
   id: string;
@@ -268,6 +271,7 @@ export default function Home() {
     updateResult(run.id, id, {
       status: 'running',
       error: undefined,
+      diagnostics: undefined,
       output: undefined,
       note: undefined,
       preferred: false,
@@ -288,9 +292,16 @@ export default function Home() {
       });
       const data = (await response.json()) as TranscriptionOutput & {
         error?: string;
+        diagnostics?: ProviderDiagnostics;
       };
-      if (!response.ok)
-        throw new Error(data.error || 'The provider request failed.');
+      if (!response.ok) {
+        updateResult(run.id, id, {
+          status: 'error',
+          error: data.error || 'The provider request failed.',
+          diagnostics: data.diagnostics,
+        });
+        return;
+      }
       const output = data as TranscriptionOutput;
       if (output.audioHash !== run.clip.hash)
         throw new Error('Audio verification failed. Please retry this model.');

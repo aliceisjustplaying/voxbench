@@ -957,3 +957,22 @@ summary:focus-visible {
   font: 13px/1.5 monospace;
   overflow-wrap: anywhere;
 }
+.provider-diagnostics {
+  width: 100%;
+  min-width: 0;
+  font-size: 13px;
+}
+.provider-diagnostics summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.provider-diagnostics pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 320px;
+  overflow: auto;
+  padding: 10px;
+  background: #f3f5fa;
+  color: #26344e;
+  font: 12px/1.5 monospace;
+}

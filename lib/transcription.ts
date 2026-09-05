@@ -20,11 +20,27 @@ export type TranscriptionOutput = {
 };
 type Json = Record<string, any>;
 type Fetcher = typeof fetch;
+export type ProviderDiagnostics = {
+  provider: string;
+  model: string;
+  endpoint: string;
+  status: number;
+  at: string;
+  headers: Record<string, string>;
+  response: string;
+  truncated: boolean;
+};
 export class RequestError extends Error {
   status: number;
-  constructor(message: string, status = 400) {
+  diagnostics?: ProviderDiagnostics;
+  constructor(
+    message: string,
+    status = 400,
+    diagnostics?: ProviderDiagnostics,
+  ) {
     super(message);
     this.status = status;
+    this.diagnostics = diagnostics;
   }
 }
 
@@ -175,11 +191,74 @@ export async function transcribe(
       signal,
       redirect: 'manual',
     });
-    if (response.status >= 300 && response.status < 400)
+    if (!response.ok) {
+      const raw = await response.text();
+      let data: Json = {};
+      try {
+        data = JSON.parse(raw) ?? {};
+      } catch {
+        /* Preserve non-JSON failures too. */
+      }
+      const redact = (value: unknown): unknown => {
+        if (typeof value === 'string')
+          return value
+            .replaceAll(key, '[redacted]')
+            .replaceAll(input.audio, '[audio omitted]')
+            .replace(/[A-Za-z0-9+/=]{160,}/g, '[long encoded value omitted]');
+        if (Array.isArray(value)) return value.map(redact);
+        if (value && typeof value === 'object')
+          return Object.fromEntries(
+            Object.entries(value).map(([name, v]) => [
+              name,
+              /authorization|cookie|api.?key|token|audio|file|input/i.test(name)
+                ? '[redacted]'
+                : redact(v),
+            ]),
+          );
+        return value;
+      };
+      let sanitized: string;
+      try {
+        sanitized = JSON.stringify(redact(JSON.parse(raw)), null, 2);
+      } catch {
+        sanitized = String(redact(raw));
+      }
+      const responseHeaders: Record<string, string> = {};
+      for (const name of [
+        'content-type',
+        'date',
+        'retry-after',
+        'x-request-id',
+        'request-id',
+        'x-fb-request-id',
+        'x-fb-trace-id',
+        'x-amzn-requestid',
+        'cf-ray',
+        'traceparent',
+      ]) {
+        const value = response.headers.get(name);
+        if (value) responseHeaders[name] = String(redact(value));
+      }
+      const diagnostics: ProviderDiagnostics = {
+        provider: connection,
+        model,
+        endpoint: new URL(url).origin + new URL(url).pathname,
+        status: response.status,
+        at: new Date().toISOString(),
+        headers: responseHeaders,
+        response: sanitized.slice(0, 16000),
+        truncated: sanitized.length > 16000,
+      };
+      const message =
+        response.status >= 300 && response.status < 400
+          ? 'Provider redirected the request. No credentials were forwarded to the redirect destination.'
+          : safeMessage(data, response.status, key);
       throw new RequestError(
-        'Provider redirected the request. No credentials were forwarded to the redirect destination.',
+        `${connection === 'openrouter' ? 'OpenRouter' : connection + ' direct'}: ${message}`,
         502,
+        diagnostics,
       );
+    }
     let data: Json;
     try {
       data = (await response.json()) as Json;
@@ -189,11 +268,6 @@ export async function transcribe(
         502,
       );
     }
-    if (!response.ok)
-      throw new RequestError(
-        `${connection === 'openrouter' ? 'OpenRouter' : connection + ' direct'}: ${safeMessage(data, response.status, key)}`,
-        502,
-      );
     return data;
   };
   const postJson = (
