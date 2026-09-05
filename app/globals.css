@@ -376,7 +376,7 @@ textarea:disabled {
   font-size: 14px;
 }
 .model-meta {
-  font-size: 12px;
+  font-size: 14px;
   color: #526079;
 }
 .model-choice small {
@@ -862,7 +862,7 @@ summary:focus-visible {
     font-size: 13px;
   }
   .model-meta {
-    font-size: 11px;
+    font-size: 13px;
   }
   .key-dot {
     display: none;
