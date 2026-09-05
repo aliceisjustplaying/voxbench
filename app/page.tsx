@@ -712,14 +712,7 @@ export default function Home() {
             </button>
           </div>
         )}
-        {demo.available && (
-          <p className="access-current" role="status">
-            {mode === 'free'
-              ? 'GPT, Voxtral and MAI · up to 30 seconds · Voxbench pays.'
-              : 'All 11 models · up to 60 seconds · providers bill you.'}
-          </p>
-        )}
-        {mode === 'own' && <OpenRouterConnect />}
+        {mode === 'own' && !keys.openrouter?.trim() && <OpenRouterConnect />}
       </section>
       <section className="workspace">
         <div className="capture">
@@ -812,8 +805,7 @@ export default function Home() {
             </div>
           ) : (
             <p className="record-tip">
-              Speak at your normal pace, with the names and terms you use. Audio
-              is sent only when you compare.
+              Use the names and terms you actually say.
             </p>
           )}
           <details className="vocab">

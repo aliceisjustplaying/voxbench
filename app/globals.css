@@ -1138,41 +1138,46 @@ summary:focus-visible {
   margin-bottom: 16px;
 }
 .access-choices {
-  display: inline-grid;
+  display: grid;
   grid-auto-flow: column;
   grid-auto-columns: 1fr;
-  border: 1px solid var(--primary);
-  border-radius: 6px;
-  overflow: hidden;
-  margin: 6px 0 8px;
+  width: fit-content;
+  min-width: 340px;
+  padding: 3px;
+  gap: 3px;
+  background: var(--muted);
+  border-radius: 8px;
+  margin: 4px 0 14px;
 }
 .access-choice {
-  padding: 8px 18px;
+  padding: 7px 18px;
   font-size: 14px;
   font-weight: 500;
   white-space: nowrap;
   text-align: center;
-  color: var(--primary);
+  color: var(--muted-foreground);
+  border-radius: 6px;
   cursor: pointer;
-}
-.access-choice + .access-choice {
-  border-left: 1px solid var(--primary);
 }
 .access-choice[aria-pressed='true'] {
   background: var(--primary);
   color: var(--primary-foreground);
 }
 .access-choice:focus-visible {
-  outline: 3px solid var(--primary);
-  outline-offset: 3px;
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
 }
 .access-choice:disabled {
   cursor: default;
 }
-.access-current {
-  font-size: 14px;
-  color: var(--muted-foreground);
-  margin: 0 0 14px;
+@media (max-width: 720px) {
+  .access-choices {
+    width: 100%;
+    min-width: 0;
+  }
+  .access-choice {
+    padding: 10px 8px;
+  }
 }
 .openrouter-connect p {
   color: var(--muted-foreground);

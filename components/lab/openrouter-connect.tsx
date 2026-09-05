@@ -38,7 +38,6 @@ export function OpenRouterConnect() {
       <Button disabled={connecting} onClick={connect}>
         Connect OpenRouter
       </Button>
-      <p>Approve access to your OpenRouter balance in a popup.</p>
       {error && <p role="alert">{error}</p>}
     </div>
   );
