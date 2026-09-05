@@ -58,3 +58,38 @@ export function saveVocabulary(
   if (storage.getItem(VOCABULARY_STORAGE) !== value)
     throw new Error('Storage verification failed.');
 }
+export const SETTINGS_STORAGE = 'voxbench-settings-v1';
+export type Settings = {
+  selected?: string[];
+  english?: boolean;
+  useVocabulary?: boolean;
+};
+export function readSettings(storage: Pick<Storage, 'getItem'>): Settings {
+  try {
+    const raw = JSON.parse(storage.getItem(SETTINGS_STORAGE) || '{}');
+    if (!raw || typeof raw !== 'object') return {};
+    const r = raw as Record<string, unknown>;
+    return {
+      ...(Array.isArray(r.selected) &&
+      r.selected.every((x) => typeof x === 'string')
+        ? { selected: r.selected as string[] }
+        : {}),
+      ...(typeof r.english === 'boolean' ? { english: r.english } : {}),
+      ...(typeof r.useVocabulary === 'boolean'
+        ? { useVocabulary: r.useVocabulary }
+        : {}),
+    };
+  } catch {
+    return {};
+  }
+}
+export function writeSettings(
+  storage: Pick<Storage, 'setItem'>,
+  settings: Settings,
+) {
+  try {
+    storage.setItem(SETTINGS_STORAGE, JSON.stringify(settings));
+  } catch {
+    /* Settings are a convenience; losing them is harmless. */
+  }
+}

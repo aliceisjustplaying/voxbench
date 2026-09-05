@@ -104,15 +104,6 @@ export const models: Model[] = [
     docs: 'https://openrouter.ai/nvidia/nemotron-3.5-asr-streaming-multilingual-0.6b',
   },
   {
-    id: 'qwen',
-    name: 'Qwen3 ASR 1.7B',
-    maker: 'Qwen',
-    connection: 'openrouter',
-    model: 'qwen/qwen3-asr-1.7b',
-    vocabulary: 'Vocabulary unsupported',
-    docs: 'https://openrouter.ai/qwen/qwen3-asr-1.7b',
-  },
-  {
     id: 'parakeet',
     name: 'Parakeet TDT v3',
     maker: 'NVIDIA',
@@ -132,7 +123,7 @@ export const connections: {
     id: 'openrouter',
     name: 'OpenRouter',
     url: 'https://openrouter.ai/keys',
-    note: 'One balance for OpenAI, Mistral, Deepgram, Microsoft, NVIDIA and Qwen.',
+    note: 'One balance for OpenAI, Mistral, Deepgram, Microsoft and NVIDIA.',
   },
   {
     id: 'openai',

@@ -24,6 +24,8 @@ import {
   mergeSavedKeys,
   VOCABULARY_STORAGE,
   saveVocabulary,
+  readSettings,
+  writeSettings,
 } from '@/lib/key-storage';
 import { DemoCheck } from '@/components/lab/demo-check';
 import { OpenRouterConnect } from '@/components/lab/openrouter-connect';
@@ -142,6 +144,21 @@ export default function Home() {
     [useVocabulary, setUseVocabulary] = useState(true),
     [english, setEnglish] = useState(true),
     [reference, setReference] = useState('');
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
+  useEffect(() => {
+    const saved = readSettings(localStorage);
+    const known = new Set(models.map((m) => m.id));
+    if (saved.selected)
+      setSelected(saved.selected.filter((id) => known.has(id)));
+    if (saved.english !== undefined) setEnglish(saved.english);
+    if (saved.useVocabulary !== undefined)
+      setUseVocabulary(saved.useVocabulary);
+    setSettingsLoaded(true);
+  }, []);
+  useEffect(() => {
+    if (settingsLoaded)
+      writeSettings(localStorage, { selected, english, useVocabulary });
+  }, [settingsLoaded, selected, english, useVocabulary]);
   const [vocabularyStorageError, setVocabularyStorageError] = useState('');
   const [vocabularySaved, setVocabularySaved] = useState(false);
   useEffect(() => {
@@ -737,7 +754,7 @@ export default function Home() {
         <div>
           <h1>Which speech-to-text model hears you best?</h1>
           <p>
-            Record a take, read 11 transcripts side by side, and pick the one
+            Record a take, read 10 transcripts side by side, and pick the one
             that got you right. Free trial, your own keys, or log in with
             OpenRouter.
           </p>
